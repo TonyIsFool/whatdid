@@ -2,6 +2,14 @@
 
 All notable changes to the public releases of whatdid.
 
+## 2.3.1 (2026-11-25)
+
+**3D replay and commit detection.** (2.3.0 was never published on its own; 2.3.1 is 2.3.0 plus the 2.2.x documentation.)
+
+- The hint also appears when the agent saves its work as commits during a turn, and `/whatdid new commits` explains those commits.
+- New 3D replay: good changes add floors to a building, risky steps visibly damage the floors below, each labelled with the step that did it, with a damage report.
+- Clearer undo card in the replay, with step-by-step instructions.
+
 ## 2.2.3 (2026-11-25)
 
 **Docs only.** Fixed the contact link on the "new issue" page.

@@ -6,7 +6,7 @@
     {
       "name": "whatdid",
       "source": "./",
-      "description": "Explains what the AI just changed in plain words: what changed, what is risky, how to check it, how to undo it, plus an animated replay."
+      "description": "Explains what the AI just changed in plain words: what changed, what is risky, how to check it, how to undo it, plus a 3D replay."
     }
   ]
 }

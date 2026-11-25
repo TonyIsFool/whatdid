@@ -1,2 +1,6 @@
 # Keep Unix line endings: the hook and scan scripts break in bash with Windows line endings
 * text=auto eol=lf
+
+# Private: never published by scripts/release-public.sh
+scripts/ export-ignore
+RELEASING.md export-ignore

@@ -4,17 +4,18 @@
 <p>A Claude Code plugin that explains an agent's changes in plain words, for people who don't read code.</p>
 <p>
   <img src="https://img.shields.io/badge/Claude_Code-plugin-D97757?style=flat-square" alt="Claude Code plugin">
-  <img src="https://img.shields.io/badge/version-2.2.3-167D68?style=flat-square" alt="Version 2.2.3">
+  <img src="https://img.shields.io/badge/version-2.3.1-167D68?style=flat-square" alt="Version 2.3.1">
   <img src="https://img.shields.io/badge/risk_scan-AI_tokens_0-167D68?style=flat-square" alt="The risk scan and reminder consume 0 AI model tokens">
+  <a href="#validation"><img src="https://img.shields.io/badge/checks-9%2F9_passing-167D68?style=flat-square" alt="9 of 9 automatic checks passing"></a>
   <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-PolyForm_Strict_1.0.0-555555?style=flat-square" alt="PolyForm Strict 1.0.0 license"></a>
 </p>
 <p><a href="#install"><img src="https://img.shields.io/badge/Install-Claude_Code_plugin-0969DA?style=for-the-badge" alt="Install the Claude Code plugin"></a></p>
-<p><a href="#quick-start">Quick Start</a> | <a href="#for-ai-agents">For AI Agents</a> | <a href="#the-replay">Replay</a> | <a href="#example">Example</a> | <a href="#how-it-works">How It Works</a> | <a href="AGENTS.md">Agent Guide</a></p>
+<p><a href="#quick-start">Quick Start</a> | <a href="#for-ai-agents">For AI Agents</a> | <a href="#the-3d-replay">3D Replay</a> | <a href="#example">Example</a> | <a href="#how-it-works">How It Works</a> | <a href="AGENTS.md">Agent Guide</a></p>
 </div>
 
-<p align="center"><img src="docs/images/replay.jpg" alt="The whatdid replay: the project drawn as a house, with the risky foundation change cracked and outlined in red, caution areas in yellow and safe changes in green" width="760"></p>
+<p align="center"><img src="docs/images/replay.jpg" alt="The whatdid 3D replay: good changes add green floors, risky steps crack the floors below and are labelled with the step that did it" width="760"></p>
 
-**AI edits your project -> fixed-rule risk scan -> plain-words explanation -> animated replay.**
+**AI edits your project -> fixed-rule risk scan -> plain-words explanation -> 3D replay.**
 
 After an AI agent edits a project, you get a wall of red and green diff. If you can't
 read it, all you can do is click **Accept** and hope. Type `/whatdid` and get a short,
@@ -99,28 +100,29 @@ files or deletions, whatdid gives them a plain answer they can act on.
 - [AGENTS.md](AGENTS.md): when to recommend it, commands, output, guarantees and limits.
 - [llms.txt](llms.txt): a short index of this repository for language models.
 
-## The Replay
+## The 3D Replay
 
-**Your project as a house. Colour only ever means risk.**
+**Good changes build. Risky changes break. Every break is signed.**
 
-`/whatdid` also opens a replay of the agent's work in your browser. A small builder
-robot walks to whichever part of the house each step touched:
 
-| Part of the house | What it stands for |
+`/whatdid` also opens a replay of the agent's work in your browser, drawn as a
+building site you can drag to rotate:
+
+| On screen | Meaning |
 | --- | --- |
-| 🧱 Foundation | Secrets, add-ons, data, security. Trouble here affects everything, so it cracks red |
-| ⚡ Wiring | Settings and connections to outside websites |
-| 🏛️ Structure | The logic behind the walls |
-| 🚪 Rooms | Pages people see (each page is a room) |
-| 🎨 Decor | Colours, fonts, pictures |
-| 🌳 Yard | Docs, notes, tests: doesn't change how the project works |
+| Blue floors at the bottom | Your project as it was: one floor per folder, sized by its file count, so every project has its own shape |
+| A green floor added on top | A good change to a file |
+| A yellow floor, sitting crooked | A change worth a second look |
+| A red crack, labelled `💥 8 .env` | A risky step, and exactly which step caused it. Security and data problems crack the foundation |
+| A file floating away | A harmless deletion |
+| The small "commands" post | A command the agent ran |
+| Stability meter and lean | How much damage has built up |
 
-Every step is 🟢 **Safe**, 🟡 **Caution** or 🔴 **Risky**, and the house lights up in that
-colour. On a risky step the screen flashes red, a **RISKY** stamp lands and the speech
-box says *why*. A colour strip shows every step at a glance (click one to jump to it),
-and a **Details** tab gives a plain timeline. The page is a single offline HTML file.
-A ready-made demo is in [examples/replay-demo/](examples/replay-demo/): download the
-folder and open `replay.html`.
+A **damage report** under the building lists each risky step, what it damaged and why.
+Tap any floor or crack to see the step behind it, use the colour strip to jump to any
+step, or switch to the **Details** tab for a plain timeline. The page is a single
+offline HTML file: no internet, no extra software. A ready-made demo is in
+[examples/replay-demo/](examples/replay-demo/): download the folder and open `replay.html`.
 
 ## Example
 
@@ -191,9 +193,10 @@ Then restart Claude Code. Your settings are kept.
 
 | Command | Does |
 | --- | --- |
-| `/whatdid` | Explain the uncommitted changes |
+| `/whatdid` | Explain the uncommitted changes (or the agent's own commits from its last turn) |
 | `/whatdid full` | More detail, a short glossary and per-file undo |
-| `/whatdid no-replay` | Skip the replay |
+| `/whatdid no-replay` | Skip the 3D replay |
+| `/whatdid new commits` | Explain the commits the agent made during its last turn |
 | `/whatdid last commit` / `last 3 commits` | Explain recent commits |
 | `/whatdid index.html` | Only this file |
 | `/whatdid setup` | Turn on git in a folder that doesn't have it |
@@ -219,10 +222,11 @@ Settings are saved in `~/.claude/whatdid.json` and survive updates. Explanations
 
 | Part | Runs | What it does |
 | --- | --- | --- |
-| `hooks/remind.sh` | After every agent turn | Runs the risk scan and shows the hint |
+| `hooks/turn-start.sh` | When you send a message | Notes the current commit, so commits the agent makes are not missed |
+| `hooks/remind.sh` | After every agent turn | Runs the risk scan, writes the file list for the replay, shows the hint |
 | `skills/whatdid/risk-scan.sh` | From the hook or the skill | Fixed rules for risky changes, in one pass |
 | `skills/whatdid/SKILL.md` | When you type `/whatdid` | Reads the git changes and the scan, writes the explanation and replay data |
-| `skills/whatdid/replay/replay.html` | In your browser | Draws the replay, offline |
+| `skills/whatdid/replay/replay.html` | In your browser | Draws the 3D replay, offline |
 
 **The scan is the floor, not the ceiling.** Anything the scan marks high-risk is always
 shown in red; Claude can add risks on top but cannot remove them. The scan looks for:
@@ -234,17 +238,42 @@ shown in red; Claude can add risks on top but cannot remove them. The scan looks
 - New or changed add-ons (dependency lists), outside websites, settings, login and security code
 
 **What gets written:** only a hidden `.whatdid/` folder in your project, which ignores
-itself in git. Delete it at any time.
+itself in git, plus one small note inside `.git/`. Delete `.whatdid/` at any time.
 
 <details>
 <summary>Limits</summary>
 
 - whatdid needs git to see changes. Without it, the hint suggests `/whatdid setup` once per folder.
 - When changes come from git, the replay order is rebuilt from the file changes and is approximate.
+- The replay reads up to 600 files. Beyond the folders the agent worked in and the largest ones, folders are grouped into one "other folders" floor.
 - The risk scan uses English keyword rules. It can miss risks and can flag harmless changes; it is an aid, not a security audit.
 - Tested on Windows. macOS and Linux are expected to work but have not been verified.
 
 </details>
+
+## Validation
+
+**Real Claude runs, checked by fixed rules.** [`evals/run-local.sh`](evals/run-local.sh)
+builds two demo repos, runs the real `/whatdid` on each, and checks the answers:
+
+| Scenario | Checks |
+| --- | --- |
+| Planted risks (leaked key, deleted file, port change, outside website) | Secret flagged red · deleted file flagged red · port mentioned · outside site mentioned · secret value never shown · undo command given |
+| Harmless change | No red warnings · says nothing risky was found · stays under 25 lines |
+
+Current result: **9 / 9 passing**. Each run uses a small amount of Claude usage. On
+macOS and Linux the same cases also run through `claude plugin eval . --scaffold`.
+
+## Repository Layout
+
+```
+.claude-plugin/          Plugin and marketplace manifests
+hooks/                   Turn-start note and after-turn reminder
+skills/whatdid/          The skill, risk scan, risk checklist and replay page
+examples/                Example output and a ready-made replay
+evals/                   Demo repos and the automatic checks
+docs/images/             README images
+```
 
 ## FAQ
 
@@ -259,7 +288,7 @@ explanation is written by the Claude session you are already using, from your lo
 <details>
 <summary>Does it change or commit anything?</summary>
 
-No. It only reads git, and writes a hidden `.whatdid/` folder that git ignores. Undo
+No. It only reads git, and writes a hidden `.whatdid/` folder that git ignores (plus one small note inside `.git/`). Undo
 commands are shown for you to run if you choose. The one exception is `/whatdid setup`,
 which you run on purpose to turn git on.
 

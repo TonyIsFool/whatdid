@@ -1,7 +1,7 @@
 ---
 name: whatdid
 description: Explain "what did the AI just change?" in plain words for people who can't read code. Reads the git changes and says what was done, what's risky, how to check it worked, and how to undo it, and can play an animated replay of the agent's actions in the browser. Use when the user asks "what did you change", "what do these changes mean", "is it safe to accept / commit / push this", "explain this diff", "summarize the changes", or "review what the agent did"; when the user says they don't read code or seems unable to follow a diff; or before a non-technical user approves changes that touch secrets, .gitignore, dependencies, databases, deploy files or deletions.
-argument-hint: "[brief|full] [no-replay] [last commit | <file>] · setup · set <setting> <value> · settings"
+argument-hint: "[brief|full] [no-replay] [new commits | last commit | <file>] · setup · set <setting> <value> · settings"
 allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git show:*), Bash(git log:*), Bash(git rev-parse:*), Bash(git ls-files:*), Read, Grep, Glob, Edit(.whatdid/**)
 ---
 
@@ -61,9 +61,12 @@ The user's settings live in `whatdid.json` in their Claude folder: `~/.claude/wh
 | (none, default) | Uncommitted changes, including new files | Step 1 |
 | "last commit" | The latest commit | `git show HEAD --stat`, then `git show HEAD` |
 | "last N commits" | The last N commits | `git log -N --stat`, then `git diff HEAD~N HEAD` |
+| "new commits" | The commits the AI made during its last turn | Read `.whatdid/new-commits` (one line: `<from> <to> <count>`), then `git log --stat <from>..<to>` and `git diff <from> <to>`. If `<from>` is `4b825dc642cb6eb9a060e54bf8d69288fbee4904` (the empty tree: the repo had no commits before), use `git log --stat <to>` instead of the range |
 | A file name | Only that file | Add `-- <file>` to the default commands |
 
-If the default scope has **no uncommitted changes**, explain the last commit instead and say so in one short line.
+If the default scope has **no uncommitted changes**:
+1. If `.whatdid/new-commits` exists and its `<to>` equals `git rev-parse HEAD`, the AI saved its work as commits: explain those ("new commits" row) and say so in one short line, e.g. "The AI saved these changes as 2 commits."
+2. Otherwise explain the last commit and say so in one short line.
 
 ## Step 1: Gather the facts (read-only)
 
@@ -73,7 +76,7 @@ If the default scope has **no uncommitted changes**, explain the last commit ins
 4. `git diff HEAD --stat`: lines changed per file. With no commits, use `git diff --cached --stat`.
 5. `git diff HEAD`: the actual changes. With no commits, use `git diff --cached`.
 6. **New files** (`??`) don't appear in the diff, so read them with the Read tool. Don't open binary files (images, archives); just name the file type.
-7. **Risk scan** (fixed rules, so nothing important depends on you noticing it). For uncommitted changes, first Read `.whatdid/scan.txt` at the top of the project: the reminder hook writes it after every turn that changed files, so no command is needed. Use it if its first line says `scope: uncommitted` and the files it covers match the changed files from step 3. Otherwise (missing, out of date, or you're explaining commits) run `bash "<this skill's folder>/risk-scan.sh"`, adding `<from> <to>` for commits (e.g. `HEAD~1 HEAD`). Each finding is one line: `LEVEL  kind  file  detail`.
+7. **Risk scan** (fixed rules, so nothing important depends on you noticing it). For uncommitted changes, first Read `.whatdid/scan.txt` at the top of the project: the reminder hook writes it after every turn that changed files, so no command is needed. Use it if its first line says `scope: uncommitted` and the files it covers match the changed files from step 3. For "new commits", Read `.whatdid/scan-commits.txt` instead, and use it if its scope line is `<from>..<to>` from `.whatdid/new-commits`. Otherwise (missing, out of date, or you're explaining commits) run `bash "<this skill's folder>/risk-scan.sh"`, adding `<from> <to>` for commits (e.g. `HEAD~1 HEAD`). Each finding is one line: `LEVEL  kind  file  detail`.
 
 Notes:
 - `--stat` and diff may show non-English names escaped, like `"\346\227\247..."`. Always use the readable names from step 3.
@@ -137,23 +140,24 @@ Same sections, but each one can take a few sentences. Add a "Undo just one part"
 - **Undo one modified or deleted file:** `git restore --staged --worktree <file>`. Warn that this throws away the changes and they **can't be recovered**.
 - **Undo one new file:** delete it in the file explorer (it goes to the Recycle Bin / Trash).
 - **Undo a commit** (when explaining a commit): `git revert HEAD`. This is safe: it adds an "opposite" commit, keeps history, and works even after pushing to GitHub.
+  - **Several commits** (e.g. "new commits"): `git revert --no-edit <from>..<to>`, using the real short hashes. It adds one "opposite" commit for each, newest first. If `<from>` is the empty tree, list the commit hashes instead, newest first: `git revert --no-edit <newest> … <oldest>`.
 
 ## Step 5: Animated replay (when `replay` is on)
 
 Keep every shell command in this step **simple**: one command per call, absolute paths, no `&&`, no `$(...)`, no variables. Simple commands are easy for the user to approve.
 
-The replay is a small web page that plays back, step by step, what the agent did: which files it read, created, edited, or deleted, which commands it ran, and what risks came up. It shows the project as **a house**, and a little builder robot hops to the part of the house each step touched, with a speech box explaining it. Risky parts get warning signs (a change to the foundation shows red cracks). Tapping a part lists what changed there. A "Details" tab switches to a timeline view.
+The replay is a small web page that plays back, step by step, what the agent did: which files it read, created, edited, or deleted, which commands it ran, and what risks came up. It shows **a 3D building site** (a glowing hologram the user can drag to rotate). The blue floors at the bottom are the project as it was: one floor per folder, sized by how many files it holds, so each project gets its own shape (a project with hardly any folders gets one floor per kind of file instead: logic, settings, pages, look & feel, notes & tests). **Every safe change to a file (`create`, `edit`, `rename`) adds a green floor on top; a caution one adds a yellow floor that sits crooked. A risky step adds nothing: it damages the foundation (for `foundation` steps and risky commands) or the floor that file lives on.** Steps that don't build anything get their own look: a harmless `delete` floats the file away from its floor, a `run` happens at a small "commands" post beside the building, and a `read` sweeps a scan line over that floor. Each crack carries a label with the number and file of the step that caused it, a stability meter drops, the building starts to lean, and a "Damage report" under the scene lists which step did which damage and why. Tapping a floor or a crack shows the step behind it. A "Details" tab switches to a timeline view.
 
-**The house parts (`zone`).** Give every step the zone that best fits what the file *does* for the project:
+**The kind of file (`zone`).** The page shows it in plain words next to each step ("Kind of file: pages"), and a risky `foundation` step is what damages the building's foundation. Give every step the zone that best fits what the file *does* for the project:
 
-| `zone` | Part of the house | Files that belong here |
+| `zone` | Shown as | Files that belong here |
 |---|---|---|
-| `foundation` | Foundation: problems here affect everything | Secrets (`.env`, keys), `.gitignore`, dependency lists (`package.json`, `requirements.txt`, lock files), databases and migrations, auth / login / permissions / security code, deploy and CI (`Dockerfile`, `.github/workflows`) |
-| `wiring` | Wiring & pipes | Settings and config (`config.*`, `*.yaml`, `*.toml`, ports, URLs), code that talks to outside services (APIs, servers), build tool config. Every `run` step goes here |
-| `structure` | Load-bearing structure | Program logic: scripts, functions, data handling (`*.js`, `*.ts`, `*.py`, … that aren't pages) |
-| `rooms` | Rooms (each page gets its own room) | Pages and screens people see (`*.html`, components, templates, views) |
-| `decor` | Decor | Looks: styles (`*.css`), images, fonts, icons |
-| `yard` | Yard: doesn't change how the house works | Docs and notes (`*.md`, `*.txt`), tests, the AI's own rules (`CLAUDE.md`, `.claude/`) |
+| `foundation` | security & data: everything else depends on it | Secrets (`.env`, keys), `.gitignore`, dependency lists (`package.json`, `requirements.txt`, lock files), databases and migrations, auth / login / permissions / security code, deploy and CI (`Dockerfile`, `.github/workflows`) |
+| `wiring` | settings | Settings and config (`config.*`, `*.yaml`, `*.toml`, ports, URLs), code that talks to outside services (APIs, servers), build tool config. Every `run` step goes here |
+| `structure` | logic | Program logic: scripts, functions, data handling (`*.js`, `*.ts`, `*.py`, … that aren't pages) |
+| `rooms` | pages | Pages and screens people see (`*.html`, components, templates, views) |
+| `decor` | look & feel | Looks: styles (`*.css`), images, fonts, icons |
+| `yard` | notes & tests: doesn't change how the project works | Docs and notes (`*.md`, `*.txt`), tests, the AI's own rules (`CLAUDE.md`, `.claude/`) |
 
 If you leave `zone` out, the page guesses from the file name, but your choice is better: you know what the file actually does.
 
@@ -164,7 +168,7 @@ If you leave `zone` out, the page guesses from the file name, but your choice is
 2. **The replay folder is `.whatdid/` at the top of the project** (the folder `git rev-parse --show-toplevel` prints). It sits inside the project because many setups only allow writing there, and git ignores it, so it never shows up as a change and never gets uploaded. Each run replaces the previous replay.
    - **`.whatdid/.gitignore` must exist**, containing just one line: `*`. This makes git ignore the whole folder, the `.gitignore` itself included. The reminder hook normally creates it; if it's missing, Write it before anything else.
 3. **Write** `.whatdid/data.js` with the Write tool. Use the shape below.
-4. **The page itself:** the reminder hook keeps `.whatdid/replay.html` up to date, so usually there's nothing to do. Only if it's missing (Glob `.whatdid/replay.html`), copy this skill's `replay/replay.html` there in one plain copy command with absolute paths (`cp "<from>" "<to>"`; PowerShell `Copy-Item "<from>" "<to>"`). If the copy is blocked, Read the template and Write it to `.whatdid/replay.html` unchanged instead.
+4. **The page itself and the map:** the reminder hook keeps `.whatdid/replay.html` up to date and writes `.whatdid/tree.js` (the project's file list, which the page uses to shape the existing floors), so usually there's nothing to do. Never write `tree.js` yourself: without it the page still works, with floors only for the folders the steps mention. Only if it's missing (Glob `.whatdid/replay.html`), copy this skill's `replay/replay.html` there in one plain copy command with absolute paths (`cp "<from>" "<to>"`; PowerShell `Copy-Item "<from>" "<to>"`). If the copy is blocked, Read the template and Write it to `.whatdid/replay.html` unchanged instead.
 
 `data.js` shape:
 
@@ -187,18 +191,19 @@ window.WHATDID = {
     { "level": "high", "text": "A secret key may get uploaded: .env is no longer ignored" }
   ],
   "check": "Open index.html → click Contact → you should see a form",
-  "undo": { "command": "git stash -u", "note": "Changed your mind? git stash pop brings it back" }
+  "undo": { "command": "git stash -u" }
 };
 ```
 
 - `zone` is one of `foundation`, `wiring`, `structure`, `rooms`, `decor`, `yard` (see the table above).
+- `target` for a file is its path from the top of the project, with forward slashes, exactly as git shows it (`src/pages/menu.html`, not `menu.html` and not an absolute path). The page uses it to find the floor that file lives on.
 - `action` is one of `read`, `create`, `edit`, `delete`, `rename`, `run`. For `rename`, write `target` as `"old → new"`. For `run`, `target` is the command, shortened to about 60 characters.
 - **Every step has a risk level, and the page colours everything by it**: green = safe, yellow = caution, red = risky. So be deliberate:
   - `"risk": "high"` (red) for every 🔴 item from the risk checklist, `"risk": "medium"` (yellow) for every 🟡 item. Leave `risk` out for safe steps (green) and for `read` steps (grey, "just looked").
   - The step levels must match the answer's "Watch out" list: each 🔴 / 🟡 bullet there belongs to at least one step marked `high` / `medium`.
   - For every `high` or `medium` step, add `"why"`: one short plain sentence on what could go wrong (about 12 words), e.g. "Your secret key file will be uploaded with everything else". The replay shows it in red.
 - `risks` repeats the Watch-out items in short form.
-- `undo.command` is the same command as in the answer (for a no-commit repo, set `command` to `""` and put the advice in `note`).
+- `undo.command` is the same command as in the answer. The page explains it step by step (copy it, open a terminal in the project folder, paste) and, for `git stash` and `git revert`, adds its own plain explanation, the "bring it back" command (`git stash pop`) and the warning about the user's own edits. So usually `command` is all you write. Optional, only when the defaults don't fit: `what` (one plain sentence on what the command does), `back` (the command that reverses it, or `""` for none), `warn` (one sentence). For a no-commit repo, set `command` to `""` and put the advice in `note`.
 - **Never put secrets in `data.js`** (key values, passwords, tokens). Name the file instead.
 - It must be valid JavaScript: escape quotes and backslashes in strings.
 

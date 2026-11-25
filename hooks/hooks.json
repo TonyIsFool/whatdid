@@ -1,6 +1,13 @@
 {
-  "description": "whatdid: after the AI changes files, show a one-line hint to run /whatdid (or explain automatically, if you turned that on).",
+  "description": "whatdid: after the AI changes files or makes commits, show a one-line hint to run /whatdid (or explain automatically, if you turned that on).",
   "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/turn-start.sh\"", "timeout": 10 }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
