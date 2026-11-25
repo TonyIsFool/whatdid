@@ -1,6 +1,6 @@
 {
   "name": "whatdid",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "Know what the AI changed before you click Accept. Explains an agent's code changes in plain words for people who don't read code: what changed, what is risky (fixed-rule scan for secrets, deletions, deploy, database and dependency changes), how to check it and how to undo it, with an animated replay.",
   "author": { "name": "TonyIsFool" },
   "homepage": "https://github.com/TonyIsFool/whatdid",

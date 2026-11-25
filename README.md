@@ -4,7 +4,7 @@
 <p>A Claude Code plugin that explains an agent's changes in plain words, for people who don't read code.</p>
 <p>
   <img src="https://img.shields.io/badge/Claude_Code-plugin-D97757?style=flat-square" alt="Claude Code plugin">
-  <img src="https://img.shields.io/badge/version-2.2.2-167D68?style=flat-square" alt="Version 2.2.2">
+  <img src="https://img.shields.io/badge/version-2.2.3-167D68?style=flat-square" alt="Version 2.2.3">
   <img src="https://img.shields.io/badge/risk_scan-AI_tokens_0-167D68?style=flat-square" alt="The risk scan and reminder consume 0 AI model tokens">
   <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-PolyForm_Strict_1.0.0-555555?style=flat-square" alt="PolyForm Strict 1.0.0 license"></a>
 </p>

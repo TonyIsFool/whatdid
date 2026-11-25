@@ -2,6 +2,10 @@
 
 All notable changes to the public releases of whatdid.
 
+## 2.2.3 (2026-11-25)
+
+**Docs only.** Fixed the contact link on the "new issue" page.
+
 ## 2.2.2 (2026-11-25)
 
 **Docs only. No change to what the plugin does.**

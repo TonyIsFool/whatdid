@@ -35,4 +35,4 @@ body:
     attributes:
       label: whatdid version
       description: Shown by `claude plugin list`.
-      placeholder: "2.2.2"
+      placeholder: "2.2.3"
