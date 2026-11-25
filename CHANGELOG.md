@@ -2,6 +2,13 @@
 
 All notable changes to the public releases of whatdid.
 
+## 2.3.2 (2026-11-25)
+
+**Docs only. No change to what the plugin does.**
+
+- A website with a live replay you can try in your browser, no install needed: https://tonyisfool.github.io/whatdid/
+- An animated replay at the top of the README, and a preview image for when the link is shared.
+
 ## 2.3.1 (2026-11-25)
 
 **3D replay and commit detection.** (2.3.0 was never published on its own; 2.3.1 is 2.3.0 plus the 2.2.x documentation.)

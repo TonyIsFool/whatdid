@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>whatdid: know what the AI changed before you click Accept</title>
+<meta name="description" content="whatdid is a Claude Code plugin that explains an AI agent's code changes in plain words for people who don't read code: what changed, what is risky, how to check it and how to undo it, with a 3D replay.">
+<meta name="keywords" content="Claude Code plugin, AI agent, explain diff, code changes, plain English, non-programmers, vibe coding, no-code, secret key leak, git undo, code review">
+<link rel="canonical" href="https://tonyisfool.github.io/whatdid/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="whatdid: know what the AI changed before you click Accept">
+<meta property="og:description" content="A Claude Code plugin that explains an AI agent's changes in plain words, flags risky steps with fixed rules, and replays them as a 3D building.">
+<meta property="og:url" content="https://tonyisfool.github.io/whatdid/">
+<meta property="og:image" content="https://tonyisfool.github.io/whatdid/images/social.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://tonyisfool.github.io/whatdid/images/social.png">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"whatdid","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS, Linux","description":"A Claude Code plugin that explains an AI agent's code changes in plain words: what changed, what is risky, how to check it and how to undo it, with a 3D replay.","url":"https://github.com/TonyIsFool/whatdid","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Tony Lu"},"license":"https://polyformproject.org/licenses/strict/1.0.0"}
+</script>
+<style>
+  :root { --bg: #070b1c; --panel: #10172f; --line: #22305a; --text: #eef1ff; --muted: #9aa6cc; --cyan: #6ff0ff; --safe: #4ade9a; --caution: #fbbf4a; --risky: #ff586c; --accent: #5b8cff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: radial-gradient(1200px 600px at 70% -10%, #1b2a6b 0%, transparent 60%), var(--bg); color: var(--text); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  a { color: var(--cyan); }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 22px; }
+  header { padding: 64px 0 28px; text-align: center; }
+  .eyebrow { display: inline-block; font: 600 13px ui-monospace, Consolas, monospace; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; }
+  h1 { font-size: clamp(40px, 7vw, 72px); line-height: 1.05; margin: 18px 0 10px; letter-spacing: -.02em; }
+  .tag { font-size: clamp(20px, 3vw, 28px); font-weight: 700; color: var(--cyan); margin: 0 0 14px; }
+  .lead { max-width: 680px; margin: 0 auto; color: var(--muted); font-size: 18px; }
+  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 26px; }
+  .btn { text-decoration: none; font-weight: 700; padding: 12px 20px; border-radius: 12px; border: 1px solid var(--line); color: var(--text); background: var(--panel); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .demo { margin: 26px auto 8px; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(40, 80, 220, .25); background: #04060f; }
+  .demo iframe { display: block; width: 100%; height: min(920px, 92vh); border: 0; }
+  .demo-note { text-align: center; color: var(--muted); font-size: 14px; margin: 8px 0 0; }
+  section { padding: 54px 0 8px; }
+  h2 { font-size: 28px; margin: 0 0 18px; text-align: center; }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .box { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; }
+  .box h3 { margin: 0 0 10px; font-size: 15px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  pre, code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+  .diff { margin: 0; font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
+  .diff .m { color: #ff8a96; } .diff .p { color: #7ef0b0; }
+  .plain p { margin: 6px 0; }
+  .r { color: var(--risky); font-weight: 700; } .y { color: var(--caution); font-weight: 700; }
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px; }
+  .card b { display: block; font-size: 17px; margin: 6px 0 6px; }
+  .card span { color: var(--muted); font-size: 14px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  .install { max-width: 720px; margin: 0 auto; }
+  .cmd { display: flex; gap: 10px; align-items: center; background: #050816; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 10px 0; }
+  .cmd code { flex: 1; color: var(--cyan); font-size: 15px; overflow-x: auto; white-space: nowrap; }
+  .cmd button { font: inherit; font-size: 13px; font-weight: 700; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  .small { color: var(--muted); font-size: 14px; text-align: center; }
+  footer { padding: 54px 0 40px; text-align: center; color: var(--muted); font-size: 14px; }
+  @media (max-width: 820px) { .compare { grid-template-columns: 1fr; } .cards { grid-template-columns: 1fr 1fr; } .demo iframe { height: 1180px; } }
+  @media (max-width: 480px) { .cards { grid-template-columns: 1fr; } header { padding-top: 40px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="eyebrow">A Claude Code plugin · free for personal use</span>
+    <h1>whatdid</h1>
+    <p class="tag">Know what the AI changed before you click Accept.</p>
+    <p class="lead">An AI agent just edited your project. whatdid tells you, in plain words, what changed, what's risky, how to check it and how to undo it. Then it plays the whole thing back as a 3D building: good changes build up, risky ones break what's below.</p>
+    <div class="cta">
+      <a class="btn primary" href="#try">▶ Try the live demo</a>
+      <a class="btn" href="#install">Install in Claude Code</a>
+      <a class="btn" href="https://github.com/TonyIsFool/whatdid">View on GitHub</a>
+    </div>
+  </header>
+
+  <div id="try" class="demo"><iframe src="demo/replay.html" title="Live whatdid replay of a demo project" loading="lazy"></iframe></div>
+  <p class="demo-note">This is a real replay of a demo coffee-shop site. Drag to rotate, tap a floor or a crack, or press ⏮ Restart.</p>
+
+  <section>
+    <h2>Without whatdid / with whatdid</h2>
+    <div class="compare">
+      <div class="box"><h3>What you see now</h3>
+<pre class="diff"><span class="m">- .env</span>
+<span class="p">+ MAILER_API_KEY=sk-…</span>
+<span class="m">- "port": 3000</span>
+<span class="p">+ "port": 8080</span>
+<span class="m">- old-promo.txt</span>
+… and hundreds more lines. Accept?</pre></div>
+      <div class="box plain"><h3>What whatdid tells you</h3>
+        <p><span class="r">🔴 Your secret key could get uploaded.</span> <code>.env</code> was taken off the never-upload list.</p>
+        <p><span class="r">🔴 A file was deleted</span> that you didn't ask about.</p>
+        <p><span class="y">🟡 The site now opens at :8080</span>, not :3000.</p>
+        <p>↩️ Undo all of it: <code>git stash -u</code></p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What you get</h2>
+    <div class="cards">
+      <div class="card"><span class="dot" style="background:var(--cyan)"></span><b>Plain words</b><span>What changed, grouped by what was done, in about 12 lines. No diff reading.</span></div>
+      <div class="card"><span class="dot" style="background:var(--risky)"></span><b>Risks you can't miss</b><span>Fixed rules catch leaked keys, deleted files, deploy and database changes. Secret values are never shown.</span></div>
+      <div class="card"><span class="dot" style="background:var(--safe)"></span><b>Check and undo</b><span>Where to click to check it worked, and one copy-paste command to undo it all.</span></div>
+      <div class="card"><span class="dot" style="background:var(--caution)"></span><b>3D replay</b><span>Every step on a building you can rotate. Each crack is labelled with the step that caused it.</span></div>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Install in 30 seconds</h2>
+    <div class="install">
+      <p class="small">In Claude Code, type these one at a time, then start a new session:</p>
+      <div class="cmd"><code>/plugin marketplace add TonyIsFool/whatdid</code><button type="button">Copy</button></div>
+      <div class="cmd"><code>/plugin install whatdid@whatdid</code><button type="button">Copy</button></div>
+      <p class="small">Then ask the AI for a change and type <code>/whatdid</code>. Needs Claude Code and git. No API key, no account, nothing sent anywhere.</p>
+    </div>
+  </section>
+
+  <footer>
+    whatdid · free for personal and noncommercial use under the <a href="https://github.com/TonyIsFool/whatdid/blob/main/LICENSE.md">PolyForm Strict License 1.0.0</a><br>
+    <a href="https://github.com/TonyIsFool/whatdid">GitHub</a> · <a href="https://github.com/TonyIsFool/whatdid/blob/main/AGENTS.md">Guide for AI agents</a> · <a href="https://github.com/TonyIsFool/whatdid/issues/new/choose">Feedback</a><br>
+    © 2026 Tony Lu · xulunt123@gmail.com
+  </footer>
+</div>
+<script>
+  document.querySelectorAll(".cmd button").forEach(function (b) {
+    b.onclick = function () {
+      var t = b.previousElementSibling.textContent;
+      function done() { b.textContent = "Copied ✓"; setTimeout(function () { b.textContent = "Copy"; }, 1500); }
+      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(t).then(done); else { var a = document.createElement("textarea"); a.value = t; document.body.appendChild(a); a.select(); try { document.execCommand("copy"); done(); } catch (e) {} a.remove(); }
+    };
+  });
+</script>
+</body>
+</html>

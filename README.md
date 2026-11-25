@@ -4,16 +4,16 @@
 <p>A Claude Code plugin that explains an agent's changes in plain words, for people who don't read code.</p>
 <p>
   <img src="https://img.shields.io/badge/Claude_Code-plugin-D97757?style=flat-square" alt="Claude Code plugin">
-  <img src="https://img.shields.io/badge/version-2.3.1-167D68?style=flat-square" alt="Version 2.3.1">
+  <img src="https://img.shields.io/badge/version-2.3.2-167D68?style=flat-square" alt="Version 2.3.2">
   <img src="https://img.shields.io/badge/risk_scan-AI_tokens_0-167D68?style=flat-square" alt="The risk scan and reminder consume 0 AI model tokens">
   <a href="#validation"><img src="https://img.shields.io/badge/checks-9%2F9_passing-167D68?style=flat-square" alt="9 of 9 automatic checks passing"></a>
   <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-PolyForm_Strict_1.0.0-555555?style=flat-square" alt="PolyForm Strict 1.0.0 license"></a>
 </p>
-<p><a href="#install"><img src="https://img.shields.io/badge/Install-Claude_Code_plugin-0969DA?style=for-the-badge" alt="Install the Claude Code plugin"></a></p>
+<p><a href="https://tonyisfool.github.io/whatdid/"><img src="https://img.shields.io/badge/%E2%96%B6_Try_it_live-in_your_browser-6FF0FF?style=for-the-badge&labelColor=0B1438" alt="Try the live demo in your browser"></a> <a href="#install"><img src="https://img.shields.io/badge/Install-Claude_Code_plugin-0969DA?style=for-the-badge" alt="Install the Claude Code plugin"></a></p>
 <p><a href="#quick-start">Quick Start</a> | <a href="#for-ai-agents">For AI Agents</a> | <a href="#the-3d-replay">3D Replay</a> | <a href="#example">Example</a> | <a href="#how-it-works">How It Works</a> | <a href="AGENTS.md">Agent Guide</a></p>
 </div>
 
-<p align="center"><img src="docs/images/replay.jpg" alt="The whatdid 3D replay: good changes add green floors, risky steps crack the floors below and are labelled with the step that did it" width="760"></p>
+<p align="center"><a href="https://tonyisfool.github.io/whatdid/"><img src="docs/images/demo.gif" alt="whatdid replaying an AI agent's changes: good changes add green floors, a caution step adds a crooked yellow floor, and risky steps crack the floors below, each labelled with the step that did it" width="720"></a><br><sub><b><a href="https://tonyisfool.github.io/whatdid/">▶ Try the live replay in your browser</a></b>, no install needed</sub></p>
 
 **AI edits your project -> fixed-rule risk scan -> plain-words explanation -> 3D replay.**
 
@@ -121,8 +121,8 @@ building site you can drag to rotate:
 A **damage report** under the building lists each risky step, what it damaged and why.
 Tap any floor or crack to see the step behind it, use the colour strip to jump to any
 step, or switch to the **Details** tab for a plain timeline. The page is a single
-offline HTML file: no internet, no extra software. A ready-made demo is in
-[examples/replay-demo/](examples/replay-demo/): download the folder and open `replay.html`.
+offline HTML file: no internet, no extra software. **[Try a live demo in your browser](https://tonyisfool.github.io/whatdid/)**,
+or download [examples/replay-demo/](examples/replay-demo/) and open `replay.html`.
 
 ## Example
 

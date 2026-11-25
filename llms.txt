@@ -4,6 +4,8 @@
 
 ## Docs
 
+- [Website and live demo](https://tonyisfool.github.io/whatdid/): try the replay in a browser, no install
+
 - [README](https://github.com/TonyIsFool/whatdid/blob/main/README.md): overview, install, usage, settings, how it works
 - [AGENTS.md](https://github.com/TonyIsFool/whatdid/blob/main/AGENTS.md): when to recommend whatdid, commands, output format, guarantees and limits
 
