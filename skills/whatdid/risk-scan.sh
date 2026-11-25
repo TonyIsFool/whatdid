@@ -27,7 +27,7 @@ else
   if g rev-parse --verify -q HEAD >/dev/null; then range=(HEAD); else range=(4b825dc642cb6eb9a060e54bf8d69288fbee4904); fi  # empty tree
   untracked=$(g ls-files --others --exclude-standard)
   if [ -n "$untracked" ]; then
-    mapfile -t ufiles <<< "$untracked"
+    ufiles=(); while IFS= read -r f; do ufiles+=("$f"); done <<< "$untracked"   # (no mapfile: macOS ships bash 3.2)
     ucontent=$(grep -I -s -H -n '' -- "${ufiles[@]}")   # file:line:text, text files only
   fi
 fi

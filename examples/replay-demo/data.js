@@ -2,7 +2,7 @@ window.WHATDID = {
   "lang": "en",
   "title": "Added a Contact Us page to the coffee shop site, plus a few setting tweaks and one risky change around a secret key",
   "project": "demo-site",
-  "source": "git",
+  "source": "session",
   "stats": { "files": 7, "added": 8, "removed": 5 },
   "steps": [
     { "action": "read", "zone": "rooms", "target": "index.html", "note": "Looked at the home page first" },

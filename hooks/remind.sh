@@ -7,6 +7,7 @@
 # For each, it runs the risk scan (fixed rules) and saves it in .whatdid/:
 #   scan.txt          uncommitted changes
 #   scan-commits.txt  this turn's commits; new-commits says which ones ("<from> <to> <count>")
+#   steps.tsv         the AI's real steps in order, read from the session record (session-steps.sh)
 # Then it keeps .whatdid/replay.html up to date (one permission prompt fewer for /whatdid),
 # writes .whatdid/tree.js (the project's file list, which the replay uses to shape its 3D building) and
 #   shows a one-line hint with the number of risky findings  (after_changes = "remind", the default)
@@ -123,6 +124,16 @@ else
 fi
 
 [ "$nfiles" = 0 ] && [ "$ncommits" = 0 ] && exit 0
+
+# --- The AI's real steps, in order, from this session's record (for the replay) ---
+# Steps after the commit these changes start from: this turn's first new commit's parent, or HEAD.
+if [[ $input =~ \"transcript_path\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]]; then
+  transcript=${BASH_REMATCH[1]//\\\\/\/}
+  base=$head; [ "$ncommits" != 0 ] && base=$from
+  since=""
+  [ "$base" != none ] && [ "$base" != "$EMPTY_TREE" ] && since=$(TZ=UTC git -C "$top" log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%S "$base" 2>/dev/null)
+  bash "$skill/session-steps.sh" "$transcript" "$top" "$since" > "$dir/steps.tsv" 2>/dev/null
+fi
 
 if [ "$mode" = "explain" ]; then
   printf '{"decision":"block","reason":"Project files changed during this turn. Use the whatdid skill now to explain the changes to the user in plain words, following its settings."}\n'

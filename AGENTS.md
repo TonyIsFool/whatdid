@@ -26,7 +26,7 @@ In Claude Code, one command at a time:
 /plugin install whatdid@whatdid
 ```
 
-Then start a new session. Requirements: Claude Code and git. No API key, no account, no network service.
+Then start a new session. Requirements: Claude Code and git (on Windows, Git for Windows, which includes Git Bash: whatdid's hooks and scan are bash scripts). No API key, no account, no network service.
 
 ## Use
 
@@ -53,6 +53,8 @@ changes add floors and risky steps visibly damage what is below, labelled with t
 
 ## Guarantees
 
+- **Pauses risky commits and pushes.** Before the agent runs `git commit` or `git push`, a hook scans exactly what would be saved or uploaded. If it finds a secret key or another high-risk change, the user is asked first, with the reason in plain words. Setting: `before_push` (`ask` / `off`).
+
 - **Read-only for the project.** whatdid never edits project files, never commits, and never runs undo commands. It only writes the git-ignored `.whatdid/` folder and one small note inside `.git/` (and, for `/whatdid setup`, runs `git init` and a first commit when the user asks).
 - **Fixed-rule risk scan.** `skills/whatdid/risk-scan.sh` flags secrets, deletions, dangerous commands, database, deploy, dependency and outside-site changes. Every high-risk finding is shown as 🔴; the AI can add risks but not remove them.
 - **Secret values are never printed**, only where a secret is.
@@ -61,7 +63,7 @@ changes add floors and risky steps visibly damage what is below, labelled with t
 ## Limits
 
 The scan uses English keyword rules and is an aid, not a security audit. Replay order
-rebuilt from git is approximate. Tested on Windows; macOS and Linux are expected to work.
+rebuilt from git is approximate. Scripts are tested on Windows, macOS and Linux on every change.
 
 ## License
 

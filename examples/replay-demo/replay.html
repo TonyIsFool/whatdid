@@ -152,6 +152,11 @@
   .undo ol.howto li { padding-left: 2px; }
   .undo .warnline { font-size: 13px; background: var(--bg); border-radius: 8px; padding: 6px 10px; margin-bottom: 8px; }
   .undo .back { border-top: 1px dashed var(--line); padding-top: 8px; }
+  .undo1 { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); font-size: 13px; }
+  .undo1 b { font-size: 13px; }
+  button.linkish { margin-top: 6px; padding: 2px 8px; font-size: 12px; border-radius: 8px; color: var(--muted); }
+  .undo1 .muted { margin-top: 4px; }
+  .step .undo1 { margin-top: 8px; }
 
   /* ---------- controls + risk strip ---------- */
   .controls { position: fixed; left: 0; right: 0; bottom: 0; z-index: 3; background: color-mix(in srgb, var(--panel) 92%, transparent); backdrop-filter: blur(8px); border-top: 1px solid var(--line); }
@@ -281,10 +286,14 @@
   cv.setAttribute("role", "img"); cv.setAttribute("aria-label", "The AI's changes as a building: good steps add floors, risky steps damage the ones below");
   scene.appendChild(cv); scene.appendChild(el("div", "hud", "DRAG TO ROTATE · TAP A FLOOR OR A CRACK"));
   houseView.appendChild(scene); app.appendChild(houseView);
-  var ctx = cv.getContext("2d"), CW = 900, CH = 540, DPR = 1, S = 1;
+  var ctx = cv.getContext("2d"), CW = 900, CH = 540, DPR = 1, S = 1, narrow = false;
+  var lite = false, cost = 0, costN = 0, onScreen = true;   // lite: a lighter picture for slow computers
+  if (window.IntersectionObserver) new IntersectionObserver(function (e) { onScreen = e[0].isIntersecting; }).observe(scene);   // no drawing while scrolled away
   function resize() {
-    CW = scene.clientWidth || 900; CH = Math.round(CW * .6); S = CW / 900;
-    DPR = Math.min(2, window.devicePixelRatio || 1);
+    CW = scene.clientWidth || 900;
+    narrow = CW < 560;                      // phones: a taller picture, bigger building, fewer labels
+    CH = Math.round(CW * (narrow ? 1.05 : .6)); S = narrow ? CW / 700 : CW / 900;
+    DPR = lite ? 1 : Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR); cv.style.height = CH + "px";
   }
   window.addEventListener("resize", resize);
@@ -468,7 +477,7 @@
       var x1 = NRM[sd][0] * cy - NRM[sd][2] * sy, lit = .58 + .42 * clamp(.5 - x1 * .6, 0, 1);   // light comes from the left
       var q = SIDES[sd].map(function (n) { return v[n]; });
       quad(q, rgba(shade(st.body, lit), o.alpha));
-      if (o.alpha < .15) continue;
+      if (o.alpha < .15 || (lite && o.rigid)) continue;   // lite: no windows on the far towers
       var len = sd % 2 ? p.d : p.w, px = Math.hypot(q[1][0] - q[0][0], q[1][1] - q[0][1]);
       var cols = clamp(Math.floor(Math.min(len / 9, px / 7)), 1, o.rigid ? 4 : 16), rows = clamp(Math.round(p.h / 11), 1, o.rigid ? 7 : 3);
       for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
@@ -515,7 +524,7 @@
     flush();
 
     // --- the skyline behind ---
-    FAR.map(function (b) { return { b: b, z: proj([b.x, 0, b.z])[2] }; }).filter(function (o) { return o.z > R * .8; }).sort(function (m, n) { return n.z - m.z; }).forEach(function (o) {
+    if (!lite) FAR.map(function (b) { return { b: b, z: proj([b.x, 0, b.z])[2] }; }).filter(function (o) { return o.z > R * .8; }).sort(function (m, n) { return n.z - m.z; }).forEach(function (o) {
       solid(o.b, 0, STYLE.far, { alpha: .9 * clamp((o.z - R * .8) / (R * 1.2), 0, 1), glow: .4, id: o.b.id, dark: .7, rigid: true });
     });
 
@@ -589,7 +598,7 @@
       }
     });
 
-    if (!reduce) DUST.forEach(function (d) { Dot([d[0], (d[1] + now * d[3]) % (totalH + 80), d[2]], COL.idle, .22, .9); });
+    if (!reduce && !lite) DUST.forEach(function (d) { Dot([d[0], (d[1] + now * d[3]) % (totalH + 80), d[2]], COL.idle, .22, .9); });
     waves = waves.filter(function (w) { return now - w.t0 < w.dur; });
     waves.forEach(function (w) { var u = (now - w.t0) / w.dur; if (u >= 0) ring([w.p[0], 1, w.p[2]], 8 * PX + w.R * u, w.c, (1 - u) * .9, 2.2, 44); });
 
@@ -605,16 +614,17 @@
 
   function roundBox(x, y, w, h, r) { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); }
   function tag(txt, x, y, col, bold, placed, side) {   // a small label with a pointer line; steps aside if it would cover another
-    ctx.font = (bold ? "700 " : "600 ") + Math.max(10, 11 * S) + "px ui-monospace, SFMono-Regular, Consolas, monospace";
-    var w = ctx.measureText(txt).width + 22, h = 20, bx = clamp(side > 0 ? x + 36 : side < 0 ? x - 36 - w : x - w / 2, 4, CW - w - 4), by = clamp(y - h / 2 - (side ? 0 : 20), 48, CH - h - 28);
+    ctx.font = (bold ? "700 " : "600 ") + (narrow ? 9.5 : Math.max(10, 11 * S)) + "px ui-monospace, SFMono-Regular, Consolas, monospace";
+    var gap = narrow ? 16 : 36, h = narrow ? 17 : 20, w = ctx.measureText(txt).width + (narrow ? 18 : 22);
+    var bx = clamp(side > 0 ? x + gap : side < 0 ? x - gap - w : x - w / 2, 4, CW - w - 4), by = clamp(y - h / 2 - (side ? 0 : 20), narrow ? 56 : 48, CH - h - 28);
     for (var t = 0; t < 8; t++) placed.forEach(function (o) { if (bx < o[0] + o[2] + 4 && bx + w + 4 > o[0] && by < o[1] + o[3] + 3 && by + h + 3 > o[1]) by = o[1] + o[3] + 4; });
     placed.push([bx, by, w, h]);
-    var ex = bx + (side > 0 ? 0 : side < 0 ? w : w / 2), ey = by + h / 2;
-    ctx.strokeStyle = col; ctx.globalAlpha = .75; ctx.lineWidth = bold ? 1.5 : 1; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex + (side > 0 ? -10 : side < 0 ? 10 : 0), ey); ctx.lineTo(ex, ey); ctx.stroke(); ctx.globalAlpha = 1;
+    var ex = bx + (side > 0 ? 0 : side < 0 ? w : w / 2), ey = by + h / 2, far = Math.abs(ey - y) > 70;   // pushed far away: a fainter pointer
+    ctx.strokeStyle = col; ctx.globalAlpha = far ? .35 : .75; ctx.lineWidth = bold ? 1.5 : 1; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex + (side > 0 ? -10 : side < 0 ? 10 : 0), ey); ctx.lineTo(ex, ey); ctx.stroke(); ctx.globalAlpha = 1;
     ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, 2.6, 0, 6.2832); ctx.fill();
     roundBox(bx, by, w, h, 10); ctx.fillStyle = "rgba(7,11,28,.9)"; ctx.fill(); ctx.lineWidth = bold ? 1.6 : 1; ctx.stroke();
-    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(bx + 9, ey, 2.8, 0, 6.2832); ctx.fill();
-    ctx.fillStyle = "#f2f5ff"; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(txt, bx + 16, ey + .5);
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(bx + (narrow ? 7 : 9), ey, narrow ? 2.2 : 2.8, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = "#f2f5ff"; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(txt, bx + (narrow ? 13 : 16), ey + .5);
   }
   function short(n) { return n.length > 20 ? n.slice(0, 19) + "…" : n; }
   function stepName(s) { return s.path ? baseName(s.path) : s.target; }
@@ -623,31 +633,39 @@
     // the existing floors: folder names, on the left
     ctx.font = "600 " + Math.max(9, 10 * S) + "px ui-monospace, SFMono-Regular, Consolas, monospace"; ctx.textBaseline = "middle"; ctx.textAlign = "right";
     PARTS.forEach(function (p) {
+      if (narrow && p.lv !== "risky") return;   // phones: only name the floors that were damaged
       var q = null;   // the floor's left-most corner on screen
       [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(function (c) { var t = proj(bp([p.x + c[0] * p.w / 2, p.y + p.h / 2, p.z + c[1] * p.d / 2])); if (!q || t[0] < q[0]) q = t; });
       ctx.fillStyle = p.lv === "risky" ? rgba(COL.risky, 1) : "rgba(150,185,255,.8)";
       var txt = p.fnd ? "FOUNDATION" : p.label + (p.n ? " · " + p.n + (p.n === 1 ? " file" : " files") : "");
-      ctx.fillText(txt, q[0] - 12, q[1]);
-      var tw = ctx.measureText(txt).width; placed.push([q[0] - 12 - tw, q[1] - 7, tw, 14]);   // so step labels don't land on it
+      var tw = ctx.measureText(txt).width, tx = Math.max(q[0] - 12, tw + 6);   // never cut off at the left edge
+      ctx.fillText(txt, tx, q[1]);
+      placed.push([tx - tw, q[1] - 7, tw, 14]);   // so step labels don't land on it
     });
+    // Too many labels hide the building. Damage always gets a label; on a busy site (or a phone)
+    // the rest only for the current or selected step.
+    var busy = narrow || DMGS.length + CLEANS.length + (WORK && WORK.done.length ? 1 : 0) + Math.min(BUILT.length, 12) > 14;
+    function wanted(k) { return !busy || k === cur || (selItem && selItem.k === k); }
     // damage first: these are the labels that matter most
-    DMGS.forEach(function (m) {
+    DMGS.forEach(function (m, n) {
+      if (narrow && n >= 4 && !wanted(m.d.k)) return;
       var q = proj(bp(m.d.spot)), s = steps[m.d.k];
       tag("💥 " + (m.d.k + 1) + "  " + short(stepName(s)), q[0], q[1], rgba(COL.risky, 1), true, placed, q[0] >= CW / 2 ? 1 : -1);
     });
     CLEANS.forEach(function (m) {
+      if (!wanted(m.c.k)) return;
       var q = proj(bp(m.c.spot));
       tag((m.c.k + 1) + "  🧹 " + short(stepName(steps[m.c.k])), q[0], q[1], rgba(COL[m.lv], 1), m.c.k === cur, placed, q[0] >= CW / 2 ? 1 : -1);
     });
-    if (WORK && WORK.done.length) {
+    if (WORK && WORK.done.length && (!busy || WORK.done.indexOf(cur) >= 0 || (selItem && selItem.part === WORK))) {
       var wq = proj([WORK.x, WORK.h + 16, WORK.z]), wl = WORK.done[WORK.done.length - 1];
       tag(WORK.done.map(function (n) { return n + 1; }).join("·") + "  ⚡ " + short(steps[wl].target), wq[0], wq[1], rgba(COL[WORK.lv || "safe"], 1), wl === cur, placed, wq[0] >= CW / 2 ? 1 : -1);
     }
     if (LOOK) { var lq = proj(bp(steps[LOOK.k].pos)); tag((LOOK.k + 1) + "  👀 " + short(stepName(steps[LOOK.k])), lq[0], lq[1], rgba(COL.cyan, 1), true, placed, lq[0] >= CW / 2 ? 1 : -1); }
     // new floors: step number + what it was
-    var few = BUILT.length <= 12;
+    var few = BUILT.length <= 12 && !narrow;
     BUILT.slice().reverse().forEach(function (b) {   // top floor first, so the labels stay in floor order
-      if (!few && b.lv !== "caution" && b.k !== cur && !(selItem && selItem.k === b.k)) return;
+      if (!few && (narrow || b.lv !== "caution") && b.k !== cur && !(selItem && selItem.k === b.k)) return;
       var f = b.f, q = null;   // the floor's right-most corner on screen
       [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(function (c) { var t = proj(bp([f.x + c[0] * f.w / 2, f.y + f.h / 2, f.z + c[1] * f.d / 2])); if (!q || t[0] > q[0]) q = t; });
       tag((b.k + 1) + "  " + (b.lv === "caution" ? "🚧 " : "") + short(stepName(steps[b.k])), q[0], q[1], rgba(COL[b.lv], 1), b.k === cur, placed, 1);
@@ -659,20 +677,23 @@
     [[m, m, 1, 1], [CW - m, m, -1, 1], [m, CH - m, 1, -1], [CW - m, CH - m, -1, -1]].forEach(function (c) {
       ctx.beginPath(); ctx.moveTo(c[0] + n * c[2], c[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(c[0], c[1] + n * c[3]); ctx.stroke();
     });
-    ctx.font = "600 11px ui-monospace, SFMono-Regular, Consolas, monospace"; ctx.textBaseline = "top"; ctx.fillStyle = "rgba(150,185,255,.72)";
-    ctx.textAlign = "left"; ctx.fillText("BUILDING SITE" + (D.project ? " · " + D.project : ""), m + 10, m + 9);
-    ctx.fillText("+" + BUILT.length + " FLOOR" + (BUILT.length === 1 ? "" : "S") + " · " + DMGS.length + " DAMAGE" + (DMGS.length === 1 ? "" : "S") + (CLEANS.length ? " · " + CLEANS.length + " CLEAN-UP" + (CLEANS.length === 1 ? "" : "S") : ""), m + 10, m + 25);
+    ctx.font = "600 " + (narrow ? 10 : 11) + "px ui-monospace, SFMono-Regular, Consolas, monospace"; ctx.textBaseline = "top"; ctx.fillStyle = "rgba(150,185,255,.72)";
+    var counts = "+" + BUILT.length + " FLOOR" + (BUILT.length === 1 ? "" : "S") + " · " + DMGS.length + " DAMAGE" + (DMGS.length === 1 ? "" : "S") + (CLEANS.length ? " · " + CLEANS.length + " CLEAN-UP" + (CLEANS.length === 1 ? "" : "S") : "");
+    ctx.textAlign = "left"; ctx.fillText(narrow ? counts : "BUILDING SITE" + (D.project ? " · " + D.project : ""), m + 10, m + 9);
+    if (!narrow) ctx.fillText(counts, m + 10, m + 25);
     ctx.textAlign = "right"; ctx.fillText("STEP " + Math.min(i || 0, N) + " / " + N, CW - m - 10, m + 9);
-    // how sound the building still is
-    var bw = Math.min(190, CW * .3), bx = CW / 2 - bw / 2, by = m + 8, c = stab >= 80 ? COL.safe : stab >= 50 ? COL.caution : COL.risky;
-    ctx.textAlign = "center"; ctx.fillStyle = rgba(c, 1); ctx.fillText("STABILITY " + Math.round(stab) + "%", CW / 2, by);
+    // how sound the building still is (phones: on its own line, under the counts)
+    var bw = narrow ? CW - 2 * m - 20 : Math.min(190, CW * .3), bx = narrow ? m + 10 : CW / 2 - bw / 2, by = narrow ? m + 25 : m + 8, c = stab >= 80 ? COL.safe : stab >= 50 ? COL.caution : COL.risky;
+    ctx.textAlign = narrow ? "left" : "center"; ctx.fillStyle = rgba(c, 1); ctx.fillText("STABILITY " + Math.round(stab) + "%", narrow ? bx : CW / 2, by);
+    if (narrow) by -= 2;
     roundBox(bx, by + 16, bw, 6, 3); ctx.fillStyle = "rgba(120,170,255,.18)"; ctx.fill();
     roundBox(bx, by + 16, Math.max(6, bw * stab / 100), 6, 3); ctx.fillStyle = rgba(c, .95); ctx.fill();
   }
   function angDiff(a, b) { var d = (a - b) % 6.2832; if (d > 3.1416) d -= 6.2832; if (d < -3.1416) d += 6.2832; return d; }
   function frame(ts) {
     requestAnimationFrame(frame);
-    if (document.hidden || view !== "house" || !CW) return;
+    if (document.hidden || view !== "house" || !CW || !onScreen) return;
+    var t0 = performance.now();
     now = reduce ? 0 : ts / 1000;
     if (!dragging) {
       if (yawGoal != null) yaw += angDiff(yawGoal, yaw) * .045;
@@ -692,6 +713,8 @@
     var vg = ctx.createRadialGradient(CW / 2, CH / 2, CW * .32, CW / 2, CH / 2, CW * .74);   // darker towards the corners
     vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.55)"); ctx.fillStyle = vg; ctx.fillRect(0, 0, CW, CH);
     drawLabels(); drawHud();
+    // A slow computer: if frames keep taking longer than ~22 ms, switch to the lighter picture for good.
+    if (!lite) { cost = cost * .9 + (performance.now() - t0) * .1; if (++costN > 60 && cost > 22) { lite = true; resize(); } }
   }
   // turn the camera so a point faces us (a bit from the side, so depth stays visible)
   function lookAt(p) { if (Math.hypot(p[0], p[2]) > 20) yawGoal = Math.atan2(-p[0], -p[2]) - .45; }
@@ -802,6 +825,31 @@
     stab = Math.max(10, stab);
     renderInfo();
   }
+  /* Undo just one file: the command, what it does, and how to bring the change back */
+  function q(p) { return '"' + p.replace(/"/g, '\\"') + '"'; }
+  function undoOne(s) {
+    var u = D.undo || {}, files;
+    if (s.action === "read") return null;
+    if (s.action === "run") return { cmd: "", note: "A command can't be undone on its own. Use \"Undo everything\" below, or ask the AI to reverse what it did." };
+    files = s.action === "rename" ? s.target.split("→").map(function (x) { return x.trim(); }) : [s.target];
+    var paths = files.map(q).join(" ");
+    if (u.from) {   // explaining commits: put the file back as it was before them
+      if (s.action === "create") return { cmd: "git rm " + paths, note: "Removes this file again. It shows up as a new change: commit it to keep it that way." };
+      return { cmd: "git restore --source=" + u.from + " --staged --worktree -- " + paths, note: "Puts this file back as it was before these commits. It shows up as a new change: commit it to keep it that way." };
+    }
+    if (!u.command) return s.action === "create" ? { cmd: "", note: "This is a new file: delete it in your file explorer (it goes to the Recycle Bin / Trash)." } : null;
+    return { cmd: "git stash push -u -m " + q("whatdid: " + files[files.length - 1]) + " -- " + paths, back: "git stash pop",
+      note: "Puts away only the AI's changes to this file (your other files stay as they are). Nothing is lost: \"git stash pop\" brings it back." };
+  }
+  function undoBlock(s) {
+    var u = undoOne(s); if (!u) return null;
+    var b = el("div", "undo1");
+    b.appendChild(el("b", null, "↩️ Undo just this " + (s.action === "run" ? "step" : "file")));
+    if (u.cmd) b.appendChild(copyRow(u.cmd));
+    b.appendChild(el("div", "muted", u.note));
+    if (u.cmd) b.appendChild(el("div", "muted", "Run it in a terminal in your project folder, the same way as \"Undo everything\" below."));
+    return b;
+  }
   function stepRows(list, withDamage) {
     var ul = el("ul");
     list.forEach(function (n) {
@@ -825,6 +873,7 @@
         : s.clean ? "🧹 " + n + " cleared a file out of " + partName(s.part) : s.work ? "⚡ " + n + " ran a command" : "👀 " + n + " only looked"));
       if ((s.dmg || s.level === "caution") && s.why) info.appendChild(el("div", "desc", s.why));
       info.appendChild(stepRows([it.k]));
+      var ub = undoBlock(s); if (ub) info.appendChild(ub);
       return;
     }
     if (it && it.built) {
@@ -899,6 +948,11 @@
     if (s.note) li.appendChild(el("div", "note", s.note));
     if ((s.level === "risky" || s.level === "caution") && s.why) li.appendChild(el("div", "whyline", (s.level === "risky" ? "⚠️ " : "🚧 ") + s.why));
     if (s.added || s.removed) li.appendChild(el("div", "delta", "+" + s.added + " −" + s.removed + " lines"));
+    if (s.action !== "read" && s.action !== "run") {   // a small toggle, so the timeline stays calm
+      var ut = el("button", "linkish", "↩️ Undo just this file"), ub = null;
+      ut.onclick = function () { if (ub) { ub.remove(); ub = null; } else { ub = undoBlock(s); if (ub) li.appendChild(ub); } };
+      li.appendChild(ut);
+    }
     tl.appendChild(li);
     return li;
   });

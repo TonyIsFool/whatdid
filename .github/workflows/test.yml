@@ -1,0 +1,33 @@
+name: test
+
+# Fast script checks (evals/test-scripts.sh) on Windows, macOS and Linux. No Claude runs.
+on:
+  push:
+    branches: [main]
+    paths: ["hooks/**", "skills/**", "evals/**", ".github/workflows/**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  scripts:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Tool versions
+        shell: bash
+        run: |
+          bash --version | head -1
+          awk --version 2>/dev/null | head -1 || awk -W version 2>/dev/null | head -1 || echo "awk: system awk"
+          git --version
+      - name: Script checks (macOS uses its built-in bash 3.2 and awk)
+        if: runner.os == 'macOS'
+        run: PATH="/bin:/usr/bin:$PATH" /bin/bash evals/test-scripts.sh
+      - name: Script checks
+        if: runner.os != 'macOS'
+        shell: bash
+        run: bash evals/test-scripts.sh

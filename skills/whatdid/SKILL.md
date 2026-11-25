@@ -43,6 +43,7 @@ The user's settings live in `whatdid.json` in their Claude folder: `~/.claude/wh
 | `detail` | `brief` / `full` | `brief` | How long the explanation is |
 | `replay` | `on` / `off` | `on` | Open the animated replay |
 | `after_changes` | `remind` / `explain` / `off` | `remind` | After the AI changes files: show a one-line hint to run /whatdid, explain automatically, or do nothing |
+| `before_push` | `ask` / `off` | `ask` | Before a `git commit` or `git push` that the risk scan finds high-risk: pause and ask the user, or let it run |
 
 - **`settings`**: read both files and show the current value of every setting in a short table (user file wins), plus one line on how to change one, e.g. `/whatdid set detail full`.
 - **`set <setting> <value>`**: check the name and value against the table (accept close spellings and `true`/`false` for on/off; store `replay` as `true`/`false`). Read the user's file if it exists, change only that one setting, and Write the whole file back as JSON, keeping the other settings. Then confirm in one line. If the name or value isn't valid, show the table instead and change nothing.
@@ -161,9 +162,14 @@ The replay is a small web page that plays back, step by step, what the agent did
 
 If you leave `zone` out, the page guesses from the file name, but your choice is better: you know what the file actually does.
 
-1. **Build the step list.**
-   - If this conversation shows the agent's own actions (its tool calls), use those **in the order they happened**: reads, edits, new files, deletions, commands. Set `"source": "session"`. Merge repeated edits to the same file into one step. Leave out the steps of running this skill itself.
-   - Otherwise reconstruct the steps from git: one step per changed file, ordered so related files sit together. Set `"source": "git"` (the page then says the order is approximate). Don't invent reads or commands.
+1. **Build the step list, in the real order whenever you can.**
+   - **First choice: `.whatdid/steps.tsv`.** The reminder hook writes it from this session's record: one line per step, `time  action  target`, oldest first, already limited to the steps since the commit these changes start from. `action` is `read`, `write`, `edit` or `run`; file targets are project paths, commands are shortened with secrets hidden. Read it and keep its order. Set `"source": "session"`.
+     - Turn `write` into `create` when git shows the file as new (`??` or `A`), otherwise `edit`. A file that git shows as deleted and a `run` step that removed it (`rm`, `del`, `Remove-Item`, `git rm`) becomes one `delete` step at that point.
+     - Merge repeated edits of the same file into one step, at the place of its last edit. Keep at most the first few `read` steps that matter.
+     - Leave out steps for files that are no longer changed in git (the AI changed them back), and the steps of running this skill itself.
+     - Add any changed file from git that has no step (the user edited it, or it came from another session) at the end.
+   - **Otherwise**, if this conversation shows the agent's own tool calls, use those in the order they happened, the same way. Set `"source": "session"`.
+   - **Otherwise** reconstruct the steps from git: one step per changed file, ordered so related files sit together. Set `"source": "git"` (the page then says the order is approximate). Don't invent reads or commands.
    - At most about 25 steps. Merge trivial ones.
 2. **The replay folder is `.whatdid/` at the top of the project** (the folder `git rev-parse --show-toplevel` prints). It sits inside the project because many setups only allow writing there, and git ignores it, so it never shows up as a change and never gets uploaded. Each run replaces the previous replay.
    - **`.whatdid/.gitignore` must exist**, containing just one line: `*`. This makes git ignore the whole folder, the `.gitignore` itself included. The reminder hook normally creates it; if it's missing, Write it before anything else.
@@ -204,6 +210,7 @@ window.WHATDID = {
   - For every `high` or `medium` step, add `"why"`: one short plain sentence on what could go wrong (about 12 words), e.g. "Your secret key file will be uploaded with everything else". The replay shows it in red.
 - `risks` repeats the Watch-out items in short form.
 - `undo.command` is the same command as in the answer. The page explains it step by step (copy it, open a terminal in the project folder, paste) and, for `git stash` and `git revert`, adds its own plain explanation, the "bring it back" command (`git stash pop`) and the warning about the user's own edits. So usually `command` is all you write. Optional, only when the defaults don't fit: `what` (one plain sentence on what the command does), `back` (the command that reverses it, or `""` for none), `warn` (one sentence). For a no-commit repo, set `command` to `""` and put the advice in `note`.
+- **When explaining commits** (`new commits`, `last commit`, …), also set `undo.from` to the full hash of the commit the changes start from (for "last commit", `HEAD~1`'s hash). The page uses it for its "Undo just this file" commands. For uncommitted changes leave `from` out: the page then offers `git stash push -- <file>`, which puts away one file's changes and can be brought back with `git stash pop`.
 - **Never put secrets in `data.js`** (key values, passwords, tokens). Name the file instead.
 - It must be valid JavaScript: escape quotes and backslashes in strings.
 
@@ -226,6 +233,7 @@ Skip the replay when the folder isn't a git repo (there would be nothing to make
 
 ## Special cases
 
+- **No bash on Windows:** if `bash` can't be run (only PowerShell is available, or a `bash` command fails with "not recognized" / "not found"), whatdid's scan, reminder and push guard can't run. Explain the changes from git as well as you can without the scan, and say once: "whatdid needs **Git for Windows** (it includes Git Bash). Install it from https://git-scm.com/download/win, then restart Claude Code." If Git Bash is installed somewhere unusual, the user can point Claude Code to it with the `CLAUDE_CODE_GIT_BASH_PATH` setting.
 - **Not a git repo:** say "This folder doesn't have git version tracking turned on, so I can't compare before and after." If the AI changed files earlier in this conversation, explain those from the conversation and say it may be incomplete. Then offer the one-step fix: "Type **/whatdid setup** and I'll turn it on for you, so next time you can see exactly what changed."
 - **No changes and no commits:** say "Nothing has changed yet." Skip the replay.
 - **Only binary files changed** (images, PDFs): name them, say whether each was added, replaced, or deleted, and suggest opening them to look.

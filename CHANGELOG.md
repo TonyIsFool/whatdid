@@ -2,6 +2,17 @@
 
 All notable changes to the public releases of whatdid.
 
+## 2.4.1 (2026-11-26)
+
+**Push guard, real-order replay, undo one file.** (2.4.0 was never published on its own; 2.4.1 is 2.4.0 plus fixes, tests and docs.)
+
+- **Push guard.** Before the agent runs `git commit` or `git push`, whatdid scans exactly what would be saved or uploaded. If it finds a secret key or another high-risk change, it pauses and asks you first, in plain words. Setting: `before_push`.
+- **Real order.** The replay plays the agent's steps in the order it really worked, read from the session record (secrets hidden), instead of guessing from the file changes.
+- **Undo just one file.** Tap a floor, a crack or a timeline step to get a command that undoes only that file (recoverable with `git stash pop`).
+- **Tested on three systems.** 34 fast script checks run on Windows, macOS (built-in bash 3.2) and Linux on every change.
+- The replay leaves out steps that were blocked or failed.
+- **Sturdier 3D replay.** Works on phones, stays readable with 40+ steps, and switches to a lighter picture on slow computers.
+
 ## 2.3.2 (2026-11-25)
 
 **Docs only. No change to what the plugin does.**

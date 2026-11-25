@@ -4,9 +4,9 @@
 <p>A Claude Code plugin that explains an agent's changes in plain words, for people who don't read code.</p>
 <p>
   <img src="https://img.shields.io/badge/Claude_Code-plugin-D97757?style=flat-square" alt="Claude Code plugin">
-  <img src="https://img.shields.io/badge/version-2.3.2-167D68?style=flat-square" alt="Version 2.3.2">
+  <img src="https://img.shields.io/badge/version-2.4.1-167D68?style=flat-square" alt="Version 2.4.1">
   <img src="https://img.shields.io/badge/risk_scan-AI_tokens_0-167D68?style=flat-square" alt="The risk scan and reminder consume 0 AI model tokens">
-  <a href="#validation"><img src="https://img.shields.io/badge/checks-9%2F9_passing-167D68?style=flat-square" alt="9 of 9 automatic checks passing"></a>
+  <a href="#validation"><img src="https://img.shields.io/badge/checks-43_passing-167D68?style=flat-square" alt="43 automatic checks passing: 34 script checks on Windows, macOS and Linux, and 9 real Claude runs"></a>
   <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-PolyForm_Strict_1.0.0-555555?style=flat-square" alt="PolyForm Strict 1.0.0 license"></a>
 </p>
 <p><a href="https://tonyisfool.github.io/whatdid/"><img src="https://img.shields.io/badge/%E2%96%B6_Try_it_live-in_your_browser-6FF0FF?style=for-the-badge&labelColor=0B1438" alt="Try the live demo in your browser"></a> <a href="#install"><img src="https://img.shields.io/badge/Install-Claude_Code_plugin-0969DA?style=for-the-badge" alt="Install the Claude Code plugin"></a></p>
@@ -26,7 +26,8 @@ plain answer instead:
 | **What changed?** | Grouped by what was done, not file by file |
 | **What's risky?** | Leaked secrets, deleted files, database and deploy changes, new add-ons, things you didn't ask for, marked 🔴 / 🟡 |
 | **How do I check it?** | Where to click and what you should see |
-| **How do I undo it?** | One copy-paste command, and whether you can get your work back |
+| **How do I undo it?** | One copy-paste command for everything, or for just one file, and whether you can get your work back |
+| **Is it safe to upload?** | Before the agent commits or pushes, whatdid checks what would be saved or uploaded and pauses to ask you if it finds a secret key or another high-risk change |
 
 <table>
 <tr><th>Without whatdid</th><th>With whatdid</th></tr>
@@ -93,7 +94,7 @@ files or deletions, whatdid gives them a plain answer they can act on.
 | --- | --- |
 | Install | `/plugin marketplace add TonyIsFool/whatdid`, then `/plugin install whatdid@whatdid` |
 | Run | `/whatdid` (or the user just asks "what did you change?") |
-| Needs | Claude Code and git. No API key, no account, no network service |
+| Needs | Claude Code and git (on Windows: [Git for Windows](https://git-scm.com/download/win), which includes Git Bash). No API key, no account, no network service |
 | Safe to suggest | Read-only for the project; writes only a git-ignored `.whatdid/` folder; never prints secret values |
 | Output | What changed · 🔴/🟡 risks · how to check · one-line undo |
 
@@ -119,7 +120,7 @@ building site you can drag to rotate:
 | Stability meter and lean | How much damage has built up |
 
 A **damage report** under the building lists each risky step, what it damaged and why.
-Tap any floor or crack to see the step behind it, use the colour strip to jump to any
+The steps play in the order the agent really worked, read from the session record. Tap any floor or crack to see the step behind it and a command that undoes just that file, use the colour strip to jump to any
 step, or switch to the **Details** tab for a plain timeline. The page is a single
 offline HTML file: no internet, no extra software. **[Try a live demo in your browser](https://tonyisfool.github.io/whatdid/)**,
 or download [examples/replay-demo/](examples/replay-demo/) and open `replay.html`.
@@ -154,7 +155,7 @@ Full output: [examples/coffee-shop-demo.md](examples/coffee-shop-demo.md).
 
 ## Install
 
-**Claude Code, with git available.** No API key or extra service is required.
+**Claude Code, with git available.** On Windows, use [Git for Windows](https://git-scm.com/download/win): it includes Git Bash, which whatdid's scripts run in (Claude Code uses it for hooks too). No API key or extra service is required.
 
 Type these in Claude Code, one at a time:
 
@@ -213,6 +214,7 @@ Change a setting by typing it: `/whatdid set detail full`. See all of them with 
 | `detail` | `brief` (about 12 lines) or `full` | `brief` |
 | `replay` | `on` / `off` | `on` |
 | `after_changes` | `remind` (one-line hint), `explain` (explain automatically; uses more of your usage), `off` | `remind` |
+| `before_push` | `ask` (pause a risky commit or push and ask you first) or `off` | `ask` |
 
 Settings are saved in `~/.claude/whatdid.json` and survive updates. Explanations are in English.
 
@@ -223,7 +225,9 @@ Settings are saved in `~/.claude/whatdid.json` and survive updates. Explanations
 | Part | Runs | What it does |
 | --- | --- | --- |
 | `hooks/turn-start.sh` | When you send a message | Notes the current commit, so commits the agent makes are not missed |
-| `hooks/remind.sh` | After every agent turn | Runs the risk scan, writes the file list for the replay, shows the hint |
+| `hooks/remind.sh` | After every agent turn | Runs the risk scan, saves the file list and the agent's real steps for the replay, shows the hint |
+| `hooks/push-guard.sh` | Before the agent runs a command | For `git commit` and `git push` only: scans exactly what would be saved or uploaded and asks you first if it is high-risk |
+| `skills/whatdid/session-steps.sh` | From the hook | Reads the session record and lists the agent's steps in order, with secrets hidden |
 | `skills/whatdid/risk-scan.sh` | From the hook or the skill | Fixed rules for risky changes, in one pass |
 | `skills/whatdid/SKILL.md` | When you type `/whatdid` | Reads the git changes and the scan, writes the explanation and replay data |
 | `skills/whatdid/replay/replay.html` | In your browser | Draws the 3D replay, offline |
@@ -244,14 +248,20 @@ itself in git, plus one small note inside `.git/`. Delete `.whatdid/` at any tim
 <summary>Limits</summary>
 
 - whatdid needs git to see changes. Without it, the hint suggests `/whatdid setup` once per folder.
-- When changes come from git, the replay order is rebuilt from the file changes and is approximate.
+- When there is no session record (for example, changes made by hand or in another tool), the replay order is rebuilt from the file changes and is approximate.
+- The push guard checks `git commit` and `git push` that the agent runs. It does not see commits or pushes you make yourself outside Claude Code.
 - The replay reads up to 600 files. Beyond the folders the agent worked in and the largest ones, folders are grouped into one "other folders" floor.
 - The risk scan uses English keyword rules. It can miss risks and can flag harmless changes; it is an aid, not a security audit.
-- Tested on Windows. macOS and Linux are expected to work but have not been verified.
+- Large projects are fine: on a 40,000-file project the after-turn reminder takes about 2 seconds and the push guard under 1 second (Windows).
+- The scripts are tested on Windows, macOS (with its built-in bash 3.2) and Linux on every change. The full Claude runs are tested on Windows.
 
 </details>
 
 ## Validation
+
+**Fast script checks on three systems.** [`evals/test-scripts.sh`](evals/test-scripts.sh) runs 34 checks of
+the risk scan, the reminder, the push guard, the session step reader and the replay page in
+throwaway repos, with no Claude runs. GitHub Actions runs it on Windows, macOS and Linux.
 
 **Real Claude runs, checked by fixed rules.** [`evals/run-local.sh`](evals/run-local.sh)
 builds two demo repos, runs the real `/whatdid` on each, and checks the answers:

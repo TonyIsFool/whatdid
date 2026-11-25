@@ -1,5 +1,6 @@
 {
   "detail": "brief",
   "replay": true,
-  "after_changes": "remind"
+  "after_changes": "remind",
+  "before_push": "ask"
 }

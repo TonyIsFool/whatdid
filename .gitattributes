@@ -4,3 +4,4 @@
 # Private: never published by scripts/release-public.sh
 scripts/ export-ignore
 RELEASING.md export-ignore
+PROMOTION.md export-ignore

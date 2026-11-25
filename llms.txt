@@ -15,6 +15,7 @@
 - [risk-scan.sh](https://github.com/TonyIsFool/whatdid/blob/main/skills/whatdid/risk-scan.sh): fixed rules for risky changes (secrets, deletions, deploy, database, dependencies, outside sites)
 - [risk-checklist.md](https://github.com/TonyIsFool/whatdid/blob/main/skills/whatdid/risk-checklist.md): what counts as 🔴 risky or 🟡 caution
 - [hooks/remind.sh](https://github.com/TonyIsFool/whatdid/blob/main/hooks/remind.sh): the after-turn hint
+- [hooks/push-guard.sh](https://github.com/TonyIsFool/whatdid/blob/main/hooks/push-guard.sh): pauses a risky git commit or push and asks the user first
 
 ## Examples
 
