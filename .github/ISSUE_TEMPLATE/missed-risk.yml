@@ -1,0 +1,38 @@
+name: Missed or wrong risk
+description: whatdid missed something risky, or marked something harmless as risky.
+title: "[Risk] "
+labels: ["risk-scan"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping make the risk check better.
+        **Never paste real secrets, passwords, keys or private code here.** Describe the change instead, or replace values with `xxx`.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What happened?
+      options:
+        - It missed a risky change
+        - It marked a harmless change as risky
+        - It marked something with the wrong level (🔴 / 🟡)
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: What did the AI change?
+      description: The kind of file and what changed, for example "added a .env file with an API key" or "removed a line from .gitignore".
+    validations:
+      required: true
+  - type: textarea
+    id: answer
+    attributes:
+      label: What did whatdid say?
+      description: Paste the relevant part of its answer, with any private details removed.
+  - type: input
+    id: version
+    attributes:
+      label: whatdid version
+      description: Shown by `claude plugin list`.
+      placeholder: "2.2.2"

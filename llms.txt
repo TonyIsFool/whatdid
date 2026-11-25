@@ -21,4 +21,6 @@
 
 ## Optional
 
+- [CHANGELOG.md](https://github.com/TonyIsFool/whatdid/blob/main/CHANGELOG.md): what changed in each public version
+
 - [LICENSE.md](https://github.com/TonyIsFool/whatdid/blob/main/LICENSE.md): PolyForm Strict 1.0.0, personal and noncommercial use only

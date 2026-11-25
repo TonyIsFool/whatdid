@@ -1,0 +1,45 @@
+name: Install problem or error
+description: whatdid won't install, doesn't run, or shows an error.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Remove any private details, file paths or secrets from error messages before posting.**
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you typed, and what you saw instead of what you expected. Paste the error message if there was one.
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+  - type: input
+    id: claude
+    attributes:
+      label: Claude Code version
+      description: Shown by `claude --version`.
+  - type: input
+    id: version
+    attributes:
+      label: whatdid version
+      description: Shown by `claude plugin list`.
+      placeholder: "2.2.2"
+  - type: dropdown
+    id: git
+    attributes:
+      label: Is the project folder a git repository?
+      options:
+        - "Yes"
+        - "No"
+        - Not sure

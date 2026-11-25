@@ -1,0 +1,34 @@
+name: Confusing explanation
+description: The explanation was hard to follow, too long, too technical or wrong.
+title: "[Explain] "
+labels: ["explanation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        whatdid is meant for people who don't read code, so "I didn't understand this" is a real bug.
+        **Remove any private details, secrets or code you don't want public before posting.**
+  - type: textarea
+    id: confusing
+    attributes:
+      label: Which part was confusing?
+      description: Paste the sentence or section, and say what you expected it to mean.
+    validations:
+      required: true
+  - type: dropdown
+    id: why
+    attributes:
+      label: What was the problem?
+      multiple: true
+      options:
+        - Too technical
+        - Too long
+        - Wrong or misleading
+        - Missing something I needed
+        - The replay was confusing
+  - type: input
+    id: version
+    attributes:
+      label: whatdid version
+      description: Shown by `claude plugin list`.
+      placeholder: "2.2.2"
