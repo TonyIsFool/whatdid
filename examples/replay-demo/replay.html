@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What the AI did</title>
+<style>
+  :root {
+    --bg: #f7f5fc; --panel: #ffffff; --text: #24213a; --muted: #77738f; --line: #e7e3f3;
+    /* colour means one thing only: how risky a step is */
+    --safe: #22b573; --caution: #f0a020; --risky: #ef4f5f; --none: #9a97b0;
+    --accent: #7c6cf2; --pink: #ff8fc4; --cyan: #5fe1f2; --hat: #ffc83d;
+    --high-bg: #ffeef1; --ok-bg: #e9f8f0;
+    --bot-body: #ffffff; --bot-line: #5b4fd6; --bot-screen: #2b2550;
+    --chunk: #d9d3f0; --radius: 16px;
+    --sky1: #bfe6ff; --sky2: #f1f9ff; --sun: #ffd45c; --cloud: #ffffff;
+    --soil: #d9b48c; --soil2: #c79d74; --grass: #8fd18a; --stone: #bdb7cf; --stone-line: #a49dba;
+    --wall: #fff4e4; --room: #fffaf3; --window: #cdeeff; --beam: #c09474; --roof: #ff9a8b; --roof2: #f07e70;
+    --metal: #9fb0c8; --wire: #6b7a92; --leaf: #6cc47a; --trunk: #b0815b; --sign: #f3dfc0;
+    --star: transparent;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #13121c; --panel: #1d1b2a; --text: #eeecf7; --muted: #a29fba; --line: #2e2b42;
+      --safe: #4ade9a; --caution: #fbbf4a; --risky: #ff6b7a; --none: #8c89a6;
+      --accent: #9b8cff; --pink: #ff9fcf; --cyan: #6ff0ff; --hat: #ffd25a;
+      --high-bg: #3a1f28; --ok-bg: #173226;
+      --bot-body: #ecebff; --bot-line: #7d70ff; --bot-screen: #1f1b3d;
+      --chunk: #0b0a12;
+      --sky1: #17163a; --sky2: #2b2858; --sun: #f6f1c7; --cloud: #3a3770;
+      --soil: #4b3a31; --soil2: #3f3029; --grass: #2f6141; --stone: #5d5872; --stone-line: #4b4760;
+      --wall: #3a3552; --room: #4a4166; --window: #ffd98a; --beam: #8f6c57; --roof: #b8566c; --roof2: #9c475c;
+      --metal: #5e6a82; --wire: #8f9bb8; --leaf: #3f8f5a; --trunk: #7a5a42; --sign: #6b5a48;
+      --star: #fff8d6;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Consolas, "Cascadia Mono", monospace; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 26px 20px 120px; }
+  .lv-safe { --c: var(--safe); } .lv-caution { --c: var(--caution); } .lv-risky { --c: var(--risky); } .lv-none { --c: var(--none); }
+
+  /* header */
+  .head { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+  .eyebrow { color: var(--accent); font-size: 13px; font-weight: 600; letter-spacing: .02em; }
+  h1 { font-size: 22px; line-height: 1.35; margin: 6px 0 10px; font-weight: 700; max-width: 720px; }
+  .stats { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pill { font-size: 13px; padding: 3px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .pill b { color: var(--text); }
+  .pill.lv { border-color: var(--c); background: color-mix(in srgb, var(--c) 12%, var(--panel)); color: var(--text); font-weight: 600; }
+  .source { margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .tabs { display: inline-flex; padding: 4px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); }
+  .tabs button { border: 0; background: transparent; border-radius: 999px; padding: 6px 14px; font-weight: 600; color: var(--muted); }
+  .tabs button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+
+  /* ---------- house view ---------- */
+  .scene { position: relative; margin: 18px auto 0; border-radius: 24px; overflow: hidden; border: 1px solid var(--line);
+    width: min(100%, max(467px, calc((100vh - 360px) * 1.6667))); }
+  .scene svg { display: block; width: 100%; height: auto; }
+  .cloud { animation: drift 38s linear infinite alternate; }
+  .cloud.b { animation-duration: 52s; animation-direction: alternate-reverse; }
+  @keyframes drift { from { transform: translateX(-40px); } to { transform: translateX(60px); } }
+  .star { fill: var(--star); animation: twinkle 3s ease-in-out infinite; }
+  @keyframes twinkle { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+
+  .zone { cursor: pointer; }
+  .zone .hl { fill: none; stroke: transparent; stroke-width: 5; transition: stroke .4s; }
+  .zone:hover .hl { stroke: color-mix(in srgb, var(--accent) 45%, transparent); }
+  .zone.touched .hl { stroke: var(--c); }
+  .zone.working .hl { animation: work .5s ease-in-out 3; }
+  .zone.sel .hl { stroke-dasharray: 8 6; }
+  .zone.lv-risky .hl { animation: alarm 1.1s ease-in-out infinite; }
+  @keyframes work { 50% { stroke-width: 10; } }
+  @keyframes alarm { 0%, 100% { stroke-opacity: 1; stroke-width: 6; } 50% { stroke-opacity: .3; stroke-width: 10; } }
+  .crack { fill: none; stroke: #b3263b; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 140; stroke-dashoffset: 140; transition: stroke-dashoffset 1s ease-out; }
+  .zone.lv-risky .crack { stroke-dashoffset: 0; }
+  .marker { opacity: 0; transform-box: fill-box; transform-origin: center bottom; transition: opacity .3s; pointer-events: none; }
+  .marker.on { opacity: 1; }
+  .marker.on.shake { animation: wobble 1.4s ease-in-out infinite; }
+  @keyframes wobble { 0%, 100% { transform: rotate(-9deg); } 50% { transform: rotate(9deg); } }
+
+  .room .rbg { fill: var(--room); transition: fill .4s; }
+  .room .win { fill: var(--window); }
+  .room .rlabel { font-size: 13px; fill: var(--text); font-weight: 600; }
+  .room .remo { font-size: 26px; }
+  .room.filled .rbg { fill: color-mix(in srgb, var(--c) 22%, var(--room)); stroke: var(--c); stroke-width: 3; }
+  .room.gone .rlabel { text-decoration: line-through; }
+  .room.pop { animation: pop .55s cubic-bezier(.3, 1.6, .5, 1); transform-box: fill-box; transform-origin: center; }
+  @keyframes pop { 0% { transform: scale(1); } 45% { transform: scale(1.08); } 100% { transform: scale(1); } }
+  .roofpaint { transition: fill .8s; }
+
+  /* the robot and its moods */
+  #bot .bob { animation: bob 1.8s ease-in-out infinite; }
+  #bot.walking .bob { animation: none; }
+  #bot.walking .legL { animation: legs .25s ease-in-out infinite; }
+  #bot.walking .legR { animation: legs .25s ease-in-out infinite reverse; }
+  #bot .eye { animation: blink 4s infinite; transform-box: fill-box; transform-origin: center; }
+  #bot .tip { animation: glow 1.6s ease-in-out infinite; }
+  #bot.happy .bob { animation: cheer .5s ease-in-out 2; }
+  #bot.worry .eye { fill: var(--caution) !important; }
+  #bot.worry .tip { fill: var(--caution) !important; }
+  #bot.alarm .eye { fill: var(--risky) !important; }
+  #bot.alarm .tip { fill: var(--risky) !important; animation: glow .25s steps(2) infinite; }
+  #bot.alarm .bob { animation: shake .12s linear 10; }
+  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+  @keyframes legs { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+  @keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+  @keyframes glow { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+  @keyframes cheer { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-10px); } }
+  @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+
+  /* risk effects over the scene */
+  .flash { position: absolute; inset: 0; pointer-events: none; animation: flash 1s ease-out forwards; }
+  .flash.risky { background: radial-gradient(circle at 50% 60%, transparent 30%, color-mix(in srgb, var(--risky) 55%, transparent)); }
+  .flash.caution { background: radial-gradient(circle at 50% 60%, transparent 40%, color-mix(in srgb, var(--caution) 35%, transparent)); }
+  @keyframes flash { 0% { opacity: 0; } 20% { opacity: 1; } 100% { opacity: 0; } }
+  .stamp { position: absolute; left: 50%; top: 18%; transform: translate(-50%, 0) rotate(-8deg); pointer-events: none; padding: 6px 18px; border: 4px solid var(--c); border-radius: 12px;
+    color: var(--c); background: color-mix(in srgb, var(--panel) 85%, transparent); font-weight: 900; font-size: clamp(18px, 4vw, 34px); letter-spacing: .08em; white-space: nowrap;
+    animation: stamp 2s ease-out forwards; }
+  @keyframes stamp { 0% { opacity: 0; transform: translate(-50%, 0) rotate(-8deg) scale(2.4); } 12% { opacity: 1; transform: translate(-50%, 0) rotate(-8deg) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
+  .fx { position: absolute; font-size: 26px; pointer-events: none; transform: translate(-50%, -50%); animation: rise 1.3s ease-out forwards; }
+  .fx.swing { animation: swing .9s ease-in-out forwards; }
+  .fx.puff { animation: puff 1.2s ease-out forwards; }
+  @keyframes rise { 0% { opacity: 0; transform: translate(-50%, -20%) scale(.6); } 20% { opacity: 1; transform: translate(-50%, -60%) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -160%) scale(1); } }
+  @keyframes swing { 0% { opacity: 0; transform: translate(-50%, -50%) rotate(30deg); } 15% { opacity: 1; } 30% { transform: translate(-50%, -50%) rotate(-40deg); } 50% { transform: translate(-50%, -50%) rotate(30deg); } 70% { transform: translate(-50%, -50%) rotate(-40deg); } 100% { opacity: 0; transform: translate(-50%, -50%) rotate(0); } }
+  @keyframes puff { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.4); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -90%) scale(2.2); } }
+  .confetti { position: absolute; width: 8px; height: 12px; border-radius: 2px; pointer-events: none; animation: fall 1.6s ease-out forwards; }
+  @keyframes fall { 0% { transform: translate(0, 0) rotate(0); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; } }
+
+  /* speech box */
+  .say { position: relative; margin-top: 14px; display: flex; gap: 14px; align-items: flex-start; background: var(--panel); border: 2px solid var(--line); border-radius: 18px; padding: 14px 18px 14px 14px; box-shadow: 0 5px 0 var(--chunk); transition: border-color .3s, background .3s; }
+  .say.lv-safe, .say.lv-caution, .say.lv-risky { border-color: var(--c); box-shadow: 0 5px 0 color-mix(in srgb, var(--c) 45%, var(--chunk)); }
+  .say.lv-risky { background: color-mix(in srgb, var(--risky) 7%, var(--panel)); }
+  .say .face { flex: none; width: 50px; height: 50px; border-radius: 14px; background: color-mix(in srgb, var(--accent) 12%, var(--panel)); display: grid; place-items: center; }
+  .say .body { flex: 1; min-width: 0; }
+  .say .top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-height: 22px; }
+  .say .txt { margin-top: 3px; min-height: 22px; }
+  .say .why { margin-top: 4px; font-size: 14px; font-weight: 600; color: var(--c); }
+  .say .zdesc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .say .caret { position: absolute; right: 14px; bottom: 8px; font-size: 11px; color: var(--accent); animation: glow 1s infinite; }
+  .lvbadge { font-size: 12px; font-weight: 800; color: #fff; padding: 2px 10px; border-radius: 999px; background: var(--c); white-space: nowrap; letter-spacing: .02em; }
+  .lvbadge.lv-none { background: transparent; color: var(--muted); border: 1px solid var(--line); font-weight: 600; }
+  .act { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+  .zbadge { font-size: 12px; font-weight: 700; padding: 1px 9px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); white-space: nowrap; }
+  .target { font: 13px ui-monospace, SFMono-Regular, Consolas, monospace; word-break: break-all; }
+
+  /* legend chips + zone info */
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); font-size: 13px; color: var(--muted); cursor: pointer; transition: all .3s; }
+  .chip .n { font-weight: 700; color: var(--text); display: none; }
+  .chip.touched { color: var(--text); border-color: var(--c); background: color-mix(in srgb, var(--c) 12%, var(--panel)); }
+  .chip.touched .n { display: inline; }
+  .chip.sel { box-shadow: 0 0 0 2px var(--accent); }
+  .info { margin-top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+  .info h3 { margin: 0; font-size: 15px; }
+  .info .desc { color: var(--muted); font-size: 13px; margin: 2px 0 8px; }
+  .info ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .info li { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .info .hint { color: var(--muted); font-size: 13px; }
+
+  /* ---------- details view ---------- */
+  .grid { display: grid; grid-template-columns: 260px 1fr; gap: 18px; margin-top: 20px; }
+  @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+  .panel h2 { font-size: 12px; font-weight: 700; color: var(--muted); margin: 0 0 12px; text-transform: uppercase; letter-spacing: .06em; }
+  .grid > .panel:first-child { position: sticky; top: 16px; align-self: start; max-height: calc(100vh - 110px); overflow: auto; }
+  @media (max-width: 720px) { .grid > .panel:first-child { position: static; max-height: none; } }
+  .files { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .file { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 10px; font: 13px/1.3 ui-monospace, SFMono-Regular, Consolas, monospace; word-break: break-all; opacity: 0; transform: translateX(-8px); transition: opacity .35s, transform .35s, background .6s; }
+  .file.on { opacity: 1; transform: none; }
+  .file .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--c, var(--none)); }
+  .file.flash { background: color-mix(in srgb, var(--c) 18%, transparent); }
+  .file.deleted .name { text-decoration: line-through; color: var(--muted); }
+  .empty { color: var(--muted); font-size: 13px; }
+  .timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .step { position: relative; padding: 10px 12px 10px 16px; border-radius: 12px; border: 1px solid var(--line); border-left: 6px solid var(--c);
+    opacity: 0; transform: translateY(10px); transition: opacity .4s, transform .4s, background .4s, box-shadow .4s; }
+  .step.lv-risky { background: color-mix(in srgb, var(--risky) 6%, var(--panel)); }
+  .step.on { opacity: 1; transform: none; }
+  .step.current { box-shadow: 0 0 0 2px var(--c); }
+  .step .top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .note { margin-top: 4px; }
+  .whyline { margin-top: 3px; font-size: 14px; font-weight: 600; color: var(--c); }
+  .delta { margin-top: 6px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  /* ---------- results ---------- */
+  .results { margin-top: 18px; display: grid; gap: 12px; }
+  .card { border-radius: var(--radius); padding: 14px 16px; opacity: 0; transform: translateY(10px); transition: opacity .45s, transform .45s; border: 1px solid var(--line); background: var(--panel); }
+  .card.on { opacity: 1; transform: none; }
+  .card h3 { margin: 0 0 6px; font-size: 15px; }
+  .card ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+  .card.high { background: var(--high-bg); border-color: transparent; }
+  .card.ok { background: var(--ok-bg); border-color: transparent; }
+  .cmd { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+  code.big { font: 14px ui-monospace, SFMono-Regular, Consolas, monospace; background: var(--bg); padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); }
+  .muted { color: var(--muted); font-size: 13px; }
+
+  /* ---------- controls + risk strip ---------- */
+  .controls { position: fixed; left: 0; right: 0; bottom: 0; z-index: 3; background: color-mix(in srgb, var(--panel) 92%, transparent); backdrop-filter: blur(8px); border-top: 1px solid var(--line); }
+  .controls .in { max-width: 980px; margin: 0 auto; padding: 10px 20px 12px; display: flex; align-items: center; gap: 10px; }
+  button { font: inherit; font-size: 14px; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px; cursor: pointer; }
+  button:hover { border-color: var(--muted); }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); min-width: 96px; font-weight: 600; box-shadow: 0 3px 0 color-mix(in srgb, var(--accent) 55%, #000); }
+  .stripwrap { flex: 1; min-width: 0; }
+  .strip { display: flex; gap: 3px; height: 14px; align-items: center; }
+  .seg { flex: 1; height: 10px; border: 0; padding: 0; border-radius: 4px; background: var(--c); opacity: .22; cursor: pointer; transition: opacity .3s, height .2s; }
+  .seg.done { opacity: 1; }
+  .seg.cur { height: 16px; opacity: 1; box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--c); }
+  .seg:hover { opacity: .8; }
+  .key { display: flex; gap: 12px; font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .key i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; background: var(--c); margin-right: 4px; vertical-align: -1px; }
+  .counter { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 48px; text-align: right; }
+  @media (max-width: 560px) { #speed, #all { display: none; } h1 { font-size: 19px; } }
+  .error { padding: 40px; text-align: center; color: var(--muted); }
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+</style>
+<script src="data.js"></script>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div class="controls" id="controls" hidden>
+  <div class="in">
+    <button class="primary" id="play">▶ Play</button>
+    <button id="restart">⏮ Restart</button>
+    <button id="speed">1×</button>
+    <button id="all">Show all</button>
+    <div class="stripwrap">
+      <div class="strip" id="strip"></div>
+      <div class="key"><span class="lv-safe"><i></i>Safe</span><span class="lv-caution"><i></i>Caution</span><span class="lv-risky"><i></i>Risky</span><span class="lv-none"><i></i>Just looked</span></div>
+    </div>
+    <span class="counter" id="counter"></span>
+  </div>
+</div>
+<script>
+(function () {
+  var D = window.WHATDID;
+  var app = document.getElementById("app");
+  var SVGNS = "http://www.w3.org/2000/svg";
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = String(text); return e; }
+  function sv(tag, attrs, parent) {
+    var e = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) {
+      // CSS variables only work as style properties, not as SVG attributes
+      if (typeof attrs[k] === "string" && attrs[k].indexOf("var(") === 0) e.style.setProperty(k, attrs[k]);
+      else e.setAttribute(k, attrs[k]);
+    }
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function stext(attrs, txt, parent) { var t = sv("text", attrs, parent); t.textContent = txt; return t; }
+  if (!D || !Array.isArray(D.steps)) { app.appendChild(el("div", "error", "No replay data found (data.js is missing or broken).")); return; }
+  document.title = "What the AI did" + (D.project ? " · " + D.project : "");
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- words ---------- */
+  var ACT = { read: "Looked at", create: "Created", edit: "Edited", "delete": "Deleted", run: "Ran", rename: "Renamed" };
+  var AICON = { read: "🔍", create: "✨", edit: "🔨", "delete": "💨", run: "⚡", rename: "🏷️" };
+  var LV = { safe: "🟢 SAFE", caution: "🟡 CAUTION", risky: "🔴 RISKY", none: "👀 Just looked" };
+  var LVRANK = { none: 0, safe: 1, caution: 2, risky: 3 };
+  var ZONES = ["foundation", "wiring", "structure", "rooms", "decor", "yard"];
+  var ZNAME = { foundation: "Foundation", wiring: "Wiring", structure: "Structure", rooms: "Rooms", decor: "Decor", yard: "Yard" };
+  var ZICON = { foundation: "🧱", wiring: "⚡", structure: "🏛️", rooms: "🚪", decor: "🎨", yard: "🌳" };
+  var ZDESC = {
+    foundation: "Secrets, add-ons, data and security. A problem here can affect the whole house.",
+    wiring: "Settings and connections to the outside world.",
+    structure: "The logic that makes things work behind the walls.",
+    rooms: "The pages and screens people actually see.",
+    decor: "Colors, fonts, pictures and text.",
+    yard: "Notes, docs, tests and the AI's own rules. Doesn't change how the house works."
+  };
+
+  function guessZone(s) {
+    var t = s.target.toLowerCase();
+    if (s.action === "run") return "wiring";
+    if (/(^|[\\/])\.env($|\.(local|prod|production|dev)$)|\.gitignore|package(-lock)?\.json|requirements.*\.txt|pyproject|cargo\.toml|go\.(mod|sum)|gemfile|composer\.json|\.lock$|dockerfile|\.github[\\/]|migrations?[\\/]|\.sql$|\.db$|\.sqlite|secret|credential|\.pem$|\.key$|(^|[\\/_.-])auth|login|password|security|permission/.test(t)) return "foundation";
+    if (/\.(md|txt|rst|adoc)$|(^|[\\/])docs?[\\/]|(^|[\\/])tests?[\\/]|\.(test|spec)\.|claude\.md|agents\.md|\.claude[\\/]|license/.test(t)) return "yard";
+    if (/\.(css|scss|sass|less|styl|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|otf|mp3|mp4)$|(^|[\\/])(styles?|assets?|images?|img|fonts?|public)[\\/]/.test(t)) return "decor";
+    if (/\.(html?|jsx|tsx|vue|svelte|astro|erb|hbs|ejs|njk|liquid)$|(^|[\\/])(pages?|views?|components?|templates?|screens?)[\\/]/.test(t)) return "rooms";
+    if (/config|settings|\.ya?ml$|\.toml$|\.ini$|\.env\.example|(^|[\\/_.-])api|server|proxy|webpack|vite\.|tsconfig|\.json$/.test(t)) return "wiring";
+    return "structure";
+  }
+  function levelOf(s) {
+    var r = String(s.risk || "").toLowerCase();
+    if (r === "high" || r === "risky") return "risky";
+    if (r === "medium" || r === "caution") return "caution";
+    return s.action === "read" ? "none" : "safe";
+  }
+  var ACTIONS = ["read", "create", "edit", "delete", "run", "rename"];
+  var steps = D.steps.map(function (s) {
+    var a = ACTIONS.indexOf(s.action) >= 0 ? s.action : "edit";
+    var o = { action: a, target: String(s.target || ""), note: String(s.note || ""), why: String(s.why || ""), added: +s.added || 0, removed: +s.removed || 0, risk: s.risk };
+    o.zone = ZONES.indexOf(s.zone) >= 0 ? s.zone : guessZone(o);
+    o.level = levelOf(o);
+    return o;
+  });
+  var N = steps.length;
+  var tally = { safe: 0, caution: 0, risky: 0 };
+  steps.forEach(function (s) { if (tally[s.level] != null) tally[s.level]++; });
+
+  /* ---------- header ---------- */
+  var head = el("div", "head"), hl = el("div");
+  hl.appendChild(el("div", "eyebrow", "What the AI did" + (D.project ? " · " + D.project : "")));
+  hl.appendChild(el("h1", null, D.title || ""));
+  var st = D.stats || {}, stats = el("div", "stats");
+  function pill(cls, html) { var s = el("span", "pill " + cls); s.textContent = html; stats.appendChild(s); }
+  if (tally.risky) pill("lv lv-risky", "🔴 " + tally.risky + " risky");
+  if (tally.caution) pill("lv lv-caution", "🟡 " + tally.caution + " caution");
+  pill("lv lv-safe", "🟢 " + tally.safe + " safe");
+  pill("", (st.files != null ? st.files : "–") + " files · +" + (st.added || 0) + " −" + (st.removed || 0));
+  hl.appendChild(stats);
+  hl.appendChild(el("div", "source", D.source === "session" ? "Played back in the order the AI worked." : "Rebuilt from the file changes. The order is approximate."));
+  head.appendChild(hl);
+  var tabs = el("div", "tabs"), tabHouse = el("button", null, "🏠 House"), tabDet = el("button", null, "📋 Details");
+  tabs.appendChild(tabHouse); tabs.appendChild(tabDet); head.appendChild(tabs);
+  app.appendChild(head);
+
+  /* ---------- the house scene ---------- */
+  var houseView = el("section"), scene = el("div", "scene");
+  houseView.appendChild(scene); app.appendChild(houseView);
+  var W = 900, H = 540;
+  var svg = sv("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Your project as a house" });
+  scene.appendChild(svg);
+  var defs = sv("defs", {}, svg);
+  var sky = sv("linearGradient", { id: "sky", x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+  sv("stop", { offset: "0", "stop-color": "var(--sky1)" }, sky); sv("stop", { offset: "1", "stop-color": "var(--sky2)" }, sky);
+  var brick = sv("pattern", { id: "brick", width: 40, height: 20, patternUnits: "userSpaceOnUse" }, defs);
+  sv("rect", { width: 40, height: 20, fill: "var(--stone)" }, brick);
+  sv("path", { d: "M0 10 H40 M20 0 V10 M0 10 V20 M40 10 V20", stroke: "var(--stone-line)", "stroke-width": 2, fill: "none" }, brick);
+  var soilp = sv("pattern", { id: "soil", width: 30, height: 30, patternUnits: "userSpaceOnUse" }, defs);
+  sv("rect", { width: 30, height: 30, fill: "var(--soil)" }, soilp);
+  sv("circle", { cx: 7, cy: 9, r: 2, fill: "var(--soil2)" }, soilp); sv("circle", { cx: 22, cy: 21, r: 2.5, fill: "var(--soil2)" }, soilp);
+
+  sv("rect", { width: W, height: H, fill: "url(#sky)" }, svg);
+  [[90, 60], [180, 110], [520, 40], [640, 120], [850, 150], [40, 170], [330, 30]].forEach(function (p, k) {
+    var s = sv("circle", { cx: p[0], cy: p[1], r: 1.8, "class": "star" }, svg); s.style.animationDelay = (k * .4) + "s";
+  });
+  sv("circle", { cx: 800, cy: 78, r: 34, fill: "var(--sun)" }, svg);
+  function cloud(x, y, s, cls) {
+    var g = sv("g", { "class": "cloud " + (cls || ""), opacity: .9 }, svg);
+    var gg = sv("g", { transform: "translate(" + x + " " + y + ") scale(" + s + ")" }, g);
+    [[0, 0, 26], [24, -10, 22], [46, 2, 20], [22, 8, 24]].forEach(function (c) { sv("circle", { cx: c[0], cy: c[1], r: c[2], fill: "var(--cloud)" }, gg); });
+  }
+  cloud(90, 70, 1); cloud(560, 95, .8, "b");
+  sv("rect", { x: 0, y: 410, width: W, height: 130, fill: "url(#soil)" }, svg);
+  sv("rect", { x: 0, y: 402, width: W, height: 14, rx: 7, fill: "var(--grass)" }, svg);
+
+  var zoneEls = {}, anchors = {}, markers = {};
+  function zoneGroup(z) { var g = sv("g", { "class": "zone", "data-zone": z }, svg); g.addEventListener("click", function () { selectZone(z); }); zoneEls[z] = g; return g; }
+
+  // yard
+  var gy = zoneGroup("yard");
+  sv("rect", { x: 30, y: 250, width: 150, height: 160, rx: 14, fill: "transparent", "class": "hl" }, gy);
+  sv("rect", { x: 66, y: 330, width: 12, height: 76, rx: 4, fill: "var(--trunk)" }, gy);
+  sv("circle", { cx: 72, cy: 312, r: 34, fill: "var(--leaf)" }, gy); sv("circle", { cx: 52, cy: 330, r: 22, fill: "var(--leaf)" }, gy); sv("circle", { cx: 94, cy: 328, r: 22, fill: "var(--leaf)" }, gy);
+  sv("rect", { x: 136, y: 350, width: 6, height: 56, fill: "var(--trunk)" }, gy);
+  sv("rect", { x: 112, y: 326, width: 54, height: 38, rx: 5, fill: "var(--sign)", stroke: "var(--trunk)", "stroke-width": 2 }, gy);
+  sv("path", { d: "M120 338 H158 M120 346 H152 M120 354 H146", stroke: "var(--trunk)", "stroke-width": 2, "stroke-linecap": "round" }, gy);
+  anchors.yard = [150, 404];
+
+  // foundation
+  var gf = zoneGroup("foundation");
+  sv("rect", { x: 190, y: 412, width: 420, height: 62, rx: 8, fill: "url(#brick)" }, gf);
+  sv("path", { d: "M300 414 l12 14 l-9 11 l15 15 l-7 18 M455 414 l-10 16 l12 10 l-8 20", "class": "crack" }, gf);
+  sv("rect", { x: 186, y: 408, width: 428, height: 70, rx: 10, "class": "hl" }, gf);
+  anchors.foundation = [400, 470];
+
+  // wiring
+  var gw = zoneGroup("wiring");
+  sv("path", { d: "M590 230 C 630 230, 640 300, 672 330", stroke: "var(--wire)", "stroke-width": 5, fill: "none", "stroke-linecap": "round" }, gw);
+  sv("path", { d: "M690 330 C 720 260, 760 200, 800 196 M800 196 C 840 200, 870 214, 900 230", stroke: "var(--wire)", "stroke-width": 3, fill: "none" }, gw);
+  sv("rect", { x: 796, y: 190, width: 8, height: 216, fill: "var(--trunk)" }, gw);
+  sv("rect", { x: 778, y: 198, width: 44, height: 6, rx: 3, fill: "var(--trunk)" }, gw);
+  sv("rect", { x: 660, y: 326, width: 52, height: 78, rx: 8, fill: "var(--metal)" }, gw);
+  stext({ x: 686, y: 368, "text-anchor": "middle", "dominant-baseline": "central", "font-size": 24 }, "⚡", gw);
+  sv("rect", { x: 640, y: 180, width: 200, height: 232, rx: 14, "class": "hl" }, gw);
+  anchors.wiring = [740, 404];
+
+  // structure: wall + frame
+  var gs = zoneGroup("structure");
+  sv("rect", { x: 206, y: 166, width: 388, height: 246, rx: 6, fill: "var(--wall)" }, gs);
+  var gframe = sv("g", {}, svg);
+  [["M206 290 H594", 9], ["M339 166 V412", 7], ["M461 166 V412", 7]].forEach(function (b) {
+    var p = sv("path", { d: b[0], stroke: "var(--beam)", "stroke-width": b[1], "stroke-linecap": "round" }, gframe);
+    p.style.pointerEvents = "none";
+  });
+  sv("rect", { x: 202, y: 162, width: 396, height: 254, rx: 8, "class": "hl" }, gs);
+  sv("rect", { x: 202, y: 162, width: 396, height: 254, rx: 8, fill: "none", stroke: "var(--beam)", "stroke-width": 6 }, gs);
+  anchors.structure = [606, 300];
+
+  // rooms
+  var gr = zoneGroup("rooms");
+  svg.insertBefore(gr, gframe);
+  var SLOTS = [[216, 300], [345, 300], [467, 300], [216, 176], [345, 176], [467, 176]];
+  var roomEls = SLOTS.map(function (p) {
+    var g = sv("g", { "class": "room" }, gr);
+    sv("rect", { x: p[0], y: p[1], width: 118, height: 104, rx: 6, "class": "rbg" }, g);
+    var win = sv("g", {}, g);
+    sv("rect", { x: p[0] + 36, y: p[1] + 26, width: 46, height: 38, rx: 6, "class": "win" }, win);
+    sv("path", { d: "M" + (p[0] + 59) + " " + (p[1] + 26) + " V" + (p[1] + 64) + " M" + (p[0] + 36) + " " + (p[1] + 45) + " H" + (p[0] + 82), stroke: "var(--beam)", "stroke-width": 2 }, win);
+    var lab = stext({ x: p[0] + 59, y: p[1] + 20, "text-anchor": "middle", "class": "rlabel mono" }, "", g);
+    var emo = stext({ x: p[0] + 59, y: p[1] + 56, "text-anchor": "middle", "dominant-baseline": "central", "class": "remo" }, "", g);
+    return { g: g, win: win, lab: lab, emo: emo, x: p[0] + 59, y: p[1] + 102 };
+  });
+  sv("rect", { x: 210, y: 170, width: 380, height: 238, rx: 6, "class": "hl" }, gr);
+
+  // decor: roof
+  var gd = zoneGroup("decor");
+  var roofPaint = sv("path", { d: "M180 172 L400 66 L620 172 Z", fill: "var(--roof)", "class": "roofpaint" }, gd);
+  sv("path", { d: "M180 172 L400 66 L620 172", stroke: "var(--roof2)", "stroke-width": 8, fill: "none", "stroke-linejoin": "round", "stroke-linecap": "round" }, gd);
+  sv("rect", { x: 500, y: 82, width: 30, height: 48, rx: 4, fill: "var(--roof2)" }, gd);
+  sv("circle", { cx: 400, cy: 128, r: 16, fill: "var(--window)" }, gd);
+  sv("path", { d: "M170 176 L400 58 L630 176 Z", "class": "hl", "stroke-linejoin": "round" }, gd);
+  anchors.decor = [318, 116];
+
+  // a marker per zone: ✅ safe, 🚧 caution, ⚠️ risky
+  [["foundation", 640, 456], ["wiring", 686, 316], ["structure", 616, 214], ["rooms", 186, 250], ["decor", 470, 60], ["yard", 104, 266]].forEach(function (m) {
+    var g = sv("g", { transform: "translate(" + m[1] + " " + m[2] + ")" }, svg);
+    markers[m[0]] = stext({ "class": "marker", "text-anchor": "middle", "font-size": 30 }, "", g);
+  });
+
+  var roomOf = {}, extra = 0;
+  steps.forEach(function (s) {
+    if (s.zone !== "rooms" || roomOf[s.target] != null) return;
+    var used = Object.keys(roomOf).length;
+    if (used < 5) roomOf[s.target] = used; else { roomOf[s.target] = 5; extra++; }
+  });
+  function roomLabel(t) { var n = t.split(/[\\/]/).pop() || t; return n.length > 13 ? n.slice(0, 12) + "…" : n; }
+
+  // the builder robot (original design)
+  var bot = sv("g", { id: "bot" }, svg);
+  sv("ellipse", { cx: 0, cy: 22, rx: 16, ry: 4, fill: "rgba(0,0,0,.15)" }, bot);
+  var bob = sv("g", { "class": "bob" }, bot);
+  sv("rect", { x: -10, y: 10, width: 7, height: 10, rx: 3.5, fill: "var(--bot-line)", "class": "legL" }, bob);
+  sv("rect", { x: 3, y: 10, width: 7, height: 10, rx: 3.5, fill: "var(--bot-line)", "class": "legR" }, bob);
+  sv("rect", { x: -26, y: -8, width: 8, height: 14, rx: 4, fill: "var(--bot-line)" }, bob);
+  sv("rect", { x: 18, y: -8, width: 8, height: 14, rx: 4, fill: "var(--bot-line)" }, bob);
+  sv("rect", { x: -21, y: -24, width: 42, height: 36, rx: 13, fill: "var(--bot-body)", stroke: "var(--bot-line)", "stroke-width": 2.5 }, bob);
+  sv("rect", { x: -15, y: -18, width: 30, height: 19, rx: 7, fill: "var(--bot-screen)" }, bob);
+  sv("rect", { x: -9, y: -14, width: 5, height: 8, rx: 2, fill: "var(--cyan)", "class": "eye" }, bob);
+  sv("rect", { x: 4, y: -14, width: 5, height: 8, rx: 2, fill: "var(--cyan)", "class": "eye" }, bob);
+  sv("circle", { cx: -12, cy: 5.5, r: 2.6, fill: "var(--pink)", opacity: .8 }, bob);
+  sv("circle", { cx: 12, cy: 5.5, r: 2.6, fill: "var(--pink)", opacity: .8 }, bob);
+  sv("path", { d: "M -3 5 Q 0 8 3 5", stroke: "var(--bot-line)", "stroke-width": 2, fill: "none", "stroke-linecap": "round" }, bob);
+  sv("path", { d: "M -20 -23 Q -20 -44 0 -44 Q 20 -44 20 -23 Z", fill: "var(--hat)", stroke: "#d99a12", "stroke-width": 2 }, bob);
+  sv("rect", { x: -26, y: -26, width: 52, height: 6, rx: 3, fill: "var(--hat)", stroke: "#d99a12", "stroke-width": 2 }, bob);
+  sv("rect", { x: -3, y: -43, width: 6, height: 18, rx: 3, fill: "#ffe08a" }, bob);
+  sv("line", { x1: 0, y1: -44, x2: 0, y2: -52, stroke: "var(--bot-line)", "stroke-width": 2.5, "stroke-linecap": "round" }, bob);
+  sv("circle", { cx: 0, cy: -55, r: 4.5, fill: "var(--pink)", "class": "tip" }, bob);
+  var home = [626, 404];
+
+  /* speech box, legend, info */
+  var say = el("div", "say"), face = el("div", "face");
+  var fs = sv("svg", { viewBox: "-28 -60 56 84", width: 40, height: 56 });
+  fs.appendChild(bob.cloneNode(true)); face.appendChild(fs); say.appendChild(face);
+  var sb = el("div", "body"), sTop = el("div", "top"), sTxt = el("div", "txt"), sWhy = el("div", "why"), sDesc = el("div", "zdesc");
+  sb.appendChild(sTop); sb.appendChild(sTxt); sb.appendChild(sWhy); sb.appendChild(sDesc); say.appendChild(sb);
+  say.appendChild(el("span", "caret", "▼"));
+  houseView.appendChild(say);
+
+  var legend = el("div", "legend"), chips = {};
+  ZONES.forEach(function (z) {
+    var c = el("span", "chip");
+    c.appendChild(document.createTextNode(ZICON[z] + " " + ZNAME[z] + " "));
+    var n = el("span", "n", "0"); c.appendChild(n);
+    c.onclick = function () { selectZone(z); };
+    chips[z] = { el: c, n: n }; legend.appendChild(c);
+  });
+  houseView.appendChild(legend);
+  var info = el("div", "info"); houseView.appendChild(info);
+
+  var typer = null;
+  function speak(s, text) {
+    clearInterval(typer);
+    sTop.textContent = ""; sWhy.textContent = ""; sDesc.textContent = "";
+    say.className = "say" + (s ? " lv-" + s.level : "");
+    if (s) {
+      sTop.appendChild(el("span", "lvbadge lv-" + s.level, LV[s.level]));
+      sTop.appendChild(el("span", "zbadge", ZICON[s.zone] + " " + ZNAME[s.zone]));
+      sTop.appendChild(el("span", "act", AICON[s.action] + " " + ACT[s.action]));
+      sTop.appendChild(el("span", "target", s.target));
+      if (s.level === "risky" || s.level === "caution") sWhy.textContent = (s.level === "risky" ? "⚠️ Why it's risky: " : "🚧 Worth a look: ") + (s.why || s.note);
+      sDesc.textContent = ZDESC[s.zone];
+    }
+    if (reduce || !timer) { sTxt.textContent = text; return; }
+    var k = 0; sTxt.textContent = "";
+    typer = setInterval(function () { k += 2; sTxt.textContent = text.slice(0, k); if (k >= text.length) clearInterval(typer); }, 22 / speed);
+  }
+
+  /* zone state: each part of the house shows its riskiest step */
+  var zstate = {};
+  function resetZones() {
+    ZONES.forEach(function (z) {
+      zstate[z] = { steps: [], level: "none" };
+      zoneEls[z].setAttribute("class", "zone");
+      chips[z].el.className = "chip"; chips[z].n.textContent = "0";
+      markers[z].setAttribute("class", "marker"); markers[z].textContent = "";
+    });
+    roomEls.forEach(function (r) { r.g.setAttribute("class", "room"); r.lab.textContent = ""; r.emo.textContent = ""; r.win.style.display = ""; });
+    roofPaint.style.fill = "var(--roof)";
+  }
+  function applyStep(k, animate) {
+    var s = steps[k], z = s.zone, zs = zstate[z];
+    zs.steps.push(k);
+    if (s.action !== "read") {
+      if (LVRANK[s.level] > LVRANK[zs.level]) zs.level = s.level;
+      var cls = "zone touched lv-" + zs.level + (selected === z ? " sel" : "");
+      zoneEls[z].setAttribute("class", cls);
+      chips[z].el.className = "chip touched lv-" + zs.level + (selected === z ? " sel" : "");
+      chips[z].n.textContent = zs.steps.filter(function (i) { return steps[i].action !== "read"; }).length;
+      markers[z].textContent = zs.level === "risky" ? "⚠️" : zs.level === "caution" ? "🚧" : "✅";
+      markers[z].setAttribute("class", "marker on" + (zs.level === "risky" ? " shake" : ""));
+      if (animate) { zoneEls[z].classList.remove("working"); void zoneEls[z].getBBox(); zoneEls[z].classList.add("working"); }
+    }
+    if (z === "rooms" && s.action !== "read") {
+      var r = roomEls[roomOf[s.target]];
+      var rl = r.g.dataset.lv && LVRANK[r.g.dataset.lv] > LVRANK[s.level] ? r.g.dataset.lv : s.level;
+      r.g.dataset.lv = rl;
+      r.g.setAttribute("class", "room filled lv-" + rl + (s.action === "delete" ? " gone" : ""));
+      r.win.style.display = "none";
+      r.lab.textContent = roomOf[s.target] === 5 && extra ? "+" + (extra + 1) + " pages" : roomLabel(s.target);
+      r.emo.textContent = rl === "risky" ? "⚠️" : s.action === "delete" ? "🚧" : s.action === "create" ? "✨" : "🛋️";
+      if (animate) { r.g.classList.remove("pop"); void r.g.getBBox(); r.g.classList.add("pop"); }
+    }
+    if (z === "decor" && s.action !== "read" && s.action !== "delete") roofPaint.style.fill = "color-mix(in srgb, var(--roof) 70%, var(--pink))";
+    if (selected === z) renderInfo(z);
+  }
+
+  var selected = null;
+  function selectZone(z) {
+    selected = selected === z ? null : z;
+    ZONES.forEach(function (q) { zoneEls[q].classList.toggle("sel", q === selected); chips[q].el.classList.toggle("sel", q === selected); });
+    renderInfo(selected);
+  }
+  function renderInfo(z) {
+    info.textContent = "";
+    if (!z) { info.appendChild(el("div", "hint", "👆 Tap any part of the house to see what changed there.")); return; }
+    info.appendChild(el("h3", null, ZICON[z] + " " + ZNAME[z]));
+    info.appendChild(el("div", "desc", ZDESC[z]));
+    var list = zstate[z].steps;
+    if (!list.length) { info.appendChild(el("div", "hint", "Nothing changed here.")); return; }
+    var ul = el("ul");
+    list.forEach(function (i) {
+      var s = steps[i], li = el("li");
+      li.appendChild(el("span", "lvbadge lv-" + s.level, LV[s.level]));
+      li.appendChild(el("span", "act", AICON[s.action] + " " + ACT[s.action]));
+      li.appendChild(el("span", "target", s.target));
+      if (s.note) li.appendChild(el("span", "muted", "— " + s.note));
+      ul.appendChild(li);
+    });
+    info.appendChild(ul);
+  }
+
+  function fx(x, y, emoji, kind) {
+    if (reduce) return;
+    var f = el("span", "fx" + (kind ? " " + kind : ""), emoji);
+    f.style.left = (x / W * 100) + "%"; f.style.top = (y / H * 100) + "%";
+    scene.appendChild(f); setTimeout(function () { f.remove(); }, 1500);
+  }
+  function riskFx(level) {
+    if (reduce || (level !== "risky" && level !== "caution")) return;
+    var f = el("div", "flash " + level); scene.appendChild(f); setTimeout(function () { f.remove(); }, 1100);
+    var s = el("div", "stamp lv-" + level, level === "risky" ? "⚠ RISKY" : "CAREFUL"); scene.appendChild(s); setTimeout(function () { s.remove(); }, 2100);
+  }
+  function mood(level) {
+    bot.classList.remove("alarm", "worry", "happy");
+    if (level === "risky") bot.classList.add("alarm");
+    else if (level === "caution") bot.classList.add("worry");
+    else if (level === "safe") bot.classList.add("happy");
+  }
+  function anchorFor(s) {
+    if (s.zone === "rooms") { var r = roomEls[roomOf[s.target]]; if (r) return [r.x, r.y]; }
+    return anchors[s.zone];
+  }
+
+  /* ---------- details view ---------- */
+  var detView = el("section"); detView.hidden = true;
+  var grid = el("div", "grid");
+  var fp = el("section", "panel"); fp.appendChild(el("h2", null, "Files"));
+  var fileList = el("ul", "files"); fp.appendChild(fileList);
+  var emptyNote = el("div", "empty", "No files touched yet"); fp.appendChild(emptyNote);
+  var tp = el("section", "panel"); tp.appendChild(el("h2", null, "Step by step"));
+  var tl = el("ol", "timeline"); tp.appendChild(tl);
+  grid.appendChild(fp); grid.appendChild(tp); detView.appendChild(grid); app.appendChild(detView);
+  var files = {};
+  function fileKey(s) { return s.action === "rename" ? s.target.split("→").pop().trim() : s.target; }
+  steps.forEach(function (s) {
+    if (s.action === "run") return;
+    var k = fileKey(s); if (files[k]) return;
+    var li = el("li", "file lv-none");
+    li.appendChild(el("span", "dot")); li.appendChild(el("span", "name", k));
+    fileList.appendChild(li); files[k] = li;
+  });
+  var cards = steps.map(function (s) {
+    var li = el("li", "step lv-" + s.level);
+    var top = el("div", "top");
+    top.appendChild(el("span", "lvbadge lv-" + s.level, LV[s.level]));
+    top.appendChild(el("span", "act", AICON[s.action] + " " + ACT[s.action]));
+    top.appendChild(el("span", "target", s.target));
+    top.appendChild(el("span", "zbadge", ZICON[s.zone] + " " + ZNAME[s.zone]));
+    li.appendChild(top);
+    if (s.note) li.appendChild(el("div", "note", s.note));
+    if ((s.level === "risky" || s.level === "caution") && s.why) li.appendChild(el("div", "whyline", (s.level === "risky" ? "⚠️ " : "🚧 ") + s.why));
+    if (s.added || s.removed) li.appendChild(el("div", "delta", "+" + s.added + " −" + s.removed + " lines"));
+    tl.appendChild(li);
+    return li;
+  });
+
+  /* ---------- results ---------- */
+  var results = el("div", "results");
+  var risks = Array.isArray(D.risks) ? D.risks : [];
+  var hasHigh = risks.some(function (r) { return r.level === "high"; }) || tally.risky > 0;
+  var rc = el("div", "card" + (risks.length ? (hasHigh ? " high" : "") : " ok"));
+  if (risks.length) {
+    rc.appendChild(el("h3", null, "⚠️ Watch out"));
+    var ul = el("ul");
+    risks.forEach(function (r) { ul.appendChild(el("li", null, (r.level === "high" ? "🔴 " : "🟡 ") + (r.text || ""))); });
+    rc.appendChild(ul);
+  } else rc.appendChild(el("h3", null, "🟢 Nothing risky found. Still worth a quick check."));
+  results.appendChild(rc);
+  if (D.check) { var cc = el("div", "card"); cc.appendChild(el("h3", null, "✅ Check it")); cc.appendChild(el("div", null, D.check)); results.appendChild(cc); }
+  if (D.undo && (D.undo.command || D.undo.note)) {
+    var uc = el("div", "card"); uc.appendChild(el("h3", null, "↩️ Undo everything"));
+    if (D.undo.command) {
+      var row = el("div", "cmd");
+      row.appendChild(el("code", "big", D.undo.command));
+      var cp = el("button", null, "Copy");
+      cp.onclick = function () {
+        var txt = D.undo.command;
+        function done() { cp.textContent = "Copied"; setTimeout(function () { cp.textContent = "Copy"; }, 1500); }
+        function fallback() { var t = el("textarea"); t.value = txt; document.body.appendChild(t); t.select(); try { document.execCommand("copy"); done(); } catch (e) {} t.remove(); }
+        if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(done, fallback); else fallback();
+      };
+      row.appendChild(cp); uc.appendChild(row);
+    }
+    if (D.undo.note) uc.appendChild(el("div", "muted", D.undo.note));
+    results.appendChild(uc);
+  }
+  app.appendChild(results);
+  var endCards = Array.prototype.slice.call(results.children);
+
+  /* ---------- views ---------- */
+  var view = "house";
+  function setView(v) {
+    view = v; houseView.hidden = v !== "house"; detView.hidden = v !== "details";
+    tabHouse.setAttribute("aria-pressed", v === "house"); tabDet.setAttribute("aria-pressed", v === "details");
+  }
+  tabHouse.onclick = function () { setView("house"); };
+  tabDet.onclick = function () { setView("details"); };
+  setView("house");
+
+  /* ---------- risk strip (one coloured block per step, click to jump) ---------- */
+  var strip = document.getElementById("strip");
+  var segs = steps.map(function (s, k) {
+    var b = el("button", "seg lv-" + s.level);
+    b.title = (k + 1) + ". " + LV[s.level] + " · " + ACT[s.action] + " " + s.target;
+    b.onclick = function () { seek(k); };
+    strip.appendChild(b);
+    return b;
+  });
+
+  /* ---------- playback ---------- */
+  var i = 0, timer = null, speed = 1, raf = null, pos = home.slice();
+  var $ = function (id) { return document.getElementById(id); };
+  var playBtn = $("play"), counter = $("counter");
+  $("controls").hidden = false;
+  var PAUSE = { risky: 2800, caution: 2100, safe: 1300, none: 1000 };
+
+  function placeBot(x, y) { pos = [x, y]; bot.setAttribute("transform", "translate(" + x + " " + (y - 20) + ")"); }
+  function hopTo(p, cb) {
+    cancelAnimationFrame(raf);
+    var from = pos.slice(), to = p;
+    if (reduce || !timer) { placeBot(to[0], to[1]); cb(); return; }
+    var dist = Math.hypot(to[0] - from[0], to[1] - from[1]);
+    var dur = Math.max(400, Math.min(1000, dist * 1.8)) / speed, t0 = performance.now(), lift = Math.min(90, 30 + dist * .25);
+    bot.classList.add("walking"); mood(null);
+    (function frame(now) {
+      var t = Math.min(1, (now - t0) / dur), e = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      placeBot(from[0] + (to[0] - from[0]) * e, from[1] + (to[1] - from[1]) * e - Math.sin(Math.PI * t) * lift);
+      if (t < 1) raf = requestAnimationFrame(frame); else { bot.classList.remove("walking"); cb(); }
+    })(t0);
+  }
+  function showDetail(k, animate) {
+    var s = steps[k], c = cards[k];
+    cards.forEach(function (x) { x.classList.remove("current"); });
+    c.classList.add("on", "current");
+    if (s.action !== "run") {
+      var f = files[fileKey(s)];
+      if (f) {
+        emptyNote.hidden = true;
+        var cur = f.dataset.lv || "none";
+        if (LVRANK[s.level] >= LVRANK[cur]) { f.className = "file lv-" + s.level; f.dataset.lv = s.level; }
+        f.classList.add("on");
+        if (s.action === "delete") f.classList.add("deleted");
+        if (animate) { f.classList.add("flash"); setTimeout(function () { f.classList.remove("flash"); }, 700 / speed); }
+      }
+    }
+    if (animate && view === "details") c.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+  function confetti() {
+    if (reduce) return;
+    var colors = ["var(--pink)", "var(--accent)", "var(--cyan)", "var(--safe)", "var(--hat)"];
+    for (var k = 0; k < 30; k++) {
+      var c = el("span", "confetti");
+      c.style.left = "44%"; c.style.top = "18%"; c.style.background = colors[k % colors.length];
+      c.style.setProperty("--dx", (Math.random() * 300 - 150) + "px"); c.style.setProperty("--dy", (Math.random() * 200 - 20) + "px");
+      c.style.setProperty("--rot", (Math.random() * 720 - 360) + "deg"); c.style.animationDelay = (Math.random() * .2) + "s";
+      scene.appendChild(c); setTimeout(function (x) { return function () { x.remove(); }; }(c), 2000);
+    }
+  }
+  function showResults(animate) {
+    cards.forEach(function (x) { x.classList.remove("current"); });
+    endCards.forEach(function (c, n) { setTimeout(function () { c.classList.add("on"); }, animate ? 300 + n * 300 / speed : 0); });
+    var msg = tally.risky ? "All done, but " + tally.risky + " step" + (tally.risky > 1 ? "s were" : " was") + " risky. Please read the warnings below 👇"
+      : tally.caution ? "All done! A couple of things are worth a look 👇" : "All done, and nothing risky! 🎉";
+    speak(null, msg);
+    say.className = "say lv-" + (tally.risky ? "risky" : tally.caution ? "caution" : "safe");
+    mood(tally.risky ? "risky" : tally.caution ? "caution" : "safe");
+    if (animate) {
+      if (!tally.risky && !tally.caution) confetti();
+      setTimeout(function () { results.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, 900);
+    }
+  }
+  function update() {
+    segs.forEach(function (b, k) { b.classList.toggle("done", k < i); b.classList.toggle("cur", k === i - 1 && i <= N); });
+    counter.textContent = Math.min(i, N) + " / " + N;
+    playBtn.textContent = timer ? "❚❚ Pause" : (i > N ? "↻ Replay" : "▶ Play");
+  }
+  function arrive(k, animate) {
+    var s = steps[k], p = anchorFor(s);
+    applyStep(k, animate); showDetail(k, animate);
+    speak(s, s.note || (ACT[s.action] + " " + s.target));
+    mood(s.level);
+    if (animate) {
+      fx(p[0] + 26, p[1] - 70, s.level === "safe" && s.action !== "delete" ? "✅" : AICON[s.action], s.action === "edit" ? "swing" : s.action === "delete" ? "puff" : "");
+      riskFx(s.level);
+    }
+  }
+  function step() {
+    if (!timer) return;
+    var k = i;
+    if (k < N) {
+      hopTo(anchorFor(steps[k]), function () {
+        arrive(k, true);
+        if (view === "house") { var r = scene.getBoundingClientRect(); if (r.bottom < 120 || r.top > innerHeight - 220) scene.scrollIntoView({ block: "start", behavior: "smooth" }); }
+        i = k + 1; update();
+        timer = setTimeout(step, PAUSE[steps[k].level] / speed);
+      });
+    } else {
+      hopTo(home, function () { i = N + 1; showResults(true); stop(); });
+    }
+  }
+  function play() { if (i > N) reset(); timer = true; update(); step(); }
+  function stop() { clearTimeout(timer); cancelAnimationFrame(raf); bot.classList.remove("walking"); timer = null; update(); }
+  function clearAll() {
+    resetZones();
+    cards.forEach(function (c) { c.classList.remove("on", "current"); });
+    Object.keys(files).forEach(function (k) { files[k].className = "file lv-none"; delete files[k].dataset.lv; });
+    roomEls.forEach(function (r) { delete r.g.dataset.lv; });
+    endCards.forEach(function (c) { c.classList.remove("on"); });
+    emptyNote.hidden = false; mood(null);
+  }
+  function reset() {
+    stop(); i = 0; placeBot(home[0], home[1]); clearAll(); renderInfo(selected);
+    speak(null, "Hi! Think of your project as a house. I'll show you which parts I worked on, and which steps were risky. Press Play ▶");
+    window.scrollTo(0, 0); update();
+  }
+  // jump straight to step k (from the risk strip)
+  function seek(k) {
+    stop(); clearAll();
+    for (var j = 0; j <= k; j++) { applyStep(j, false); showDetail(j, false); }
+    var p = anchorFor(steps[k]); placeBot(p[0], p[1]);
+    speak(steps[k], steps[k].note || (ACT[steps[k].action] + " " + steps[k].target)); mood(steps[k].level);
+    if (k === N - 1) { i = N + 1; showResults(false); } else i = k + 1;
+    renderInfo(selected); update();
+  }
+  function showAll() {
+    stop(); clearAll();
+    for (var k = 0; k < N; k++) { applyStep(k, false); showDetail(k, false); }
+    placeBot(home[0], home[1]); i = N + 1; showResults(false); renderInfo(selected); update();
+  }
+  playBtn.onclick = function () { timer ? stop() : play(); };
+  $("restart").onclick = function () { reset(); play(); };
+  $("all").onclick = showAll;
+  $("speed").onclick = function () { speed = speed === 1 ? 2 : speed === 2 ? 0.5 : 1; this.textContent = speed + "×"; };
+
+  reset();
+  if (reduce) showAll(); else setTimeout(play, 800);
+})();
+</script>
+</body>
+</html>

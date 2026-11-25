@@ -1,0 +1,12 @@
+{
+  "description": "whatdid: after the AI changes files, show a one-line hint to run /whatdid (or explain automatically, if you turned that on).",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/remind.sh\"", "timeout": 30 }
+        ]
+      }
+    ]
+  }
+}

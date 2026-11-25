@@ -1,0 +1,12 @@
+{
+  "name": "whatdid",
+  "owner": { "name": "TonyIsFool" },
+  "description": "whatdid: plain-words explanations of what the AI changed, for people who don't read code.",
+  "plugins": [
+    {
+      "name": "whatdid",
+      "source": "./",
+      "description": "Explains what the AI just changed in plain words, with risks, checks, undo, and an animated replay."
+    }
+  ]
+}

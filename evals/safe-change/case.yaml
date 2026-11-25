@@ -1,0 +1,20 @@
+schema_version: "1.0"
+name: safe-change
+description: "Only a heading colour and a greeting changed: nothing risky."
+runs: 1
+tags: [calm]
+execution:
+  prompt: "/whatdid:whatdid no-replay"
+  scaffold_script: ../scaffolds/safe-change.sh
+  max_turns: 25
+  timeout_seconds: 400
+  allowed_tools: ["Read", "Glob", "Grep", "Skill", "Bash(git status:*)", "Bash(git diff:*)", "Bash(git show:*)", "Bash(git log:*)", "Bash(git rev-parse:*)", "Bash(git ls-files:*)", "Bash(bash:*)"]
+graders:
+  - name: brief
+    type: llm
+    weight: 1
+    criteria: "The response is short: roughly 12 lines or fewer, plain English, no jargon left unexplained."
+  - name: calm
+    type: llm
+    weight: 3
+    criteria: "The response does NOT raise any 🔴 red warning. It says, in effect, that nothing risky was found (🟢), and describes the change as a new heading colour and a friendlier welcome message."
