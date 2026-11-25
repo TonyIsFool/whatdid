@@ -1,12 +1,12 @@
 {
   "name": "whatdid",
   "owner": { "name": "TonyIsFool" },
-  "description": "whatdid: plain-words explanations of what the AI changed, for people who don't read code.",
+  "description": "whatdid: know what the AI changed before you click Accept. Plain-words explanations of agent changes, for people who don't read code.",
   "plugins": [
     {
       "name": "whatdid",
       "source": "./",
-      "description": "Explains what the AI just changed in plain words, with risks, checks, undo, and an animated replay."
+      "description": "Explains what the AI just changed in plain words: what changed, what is risky, how to check it, how to undo it, plus an animated replay."
     }
   ]
 }

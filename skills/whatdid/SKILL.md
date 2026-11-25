@@ -1,6 +1,6 @@
 ---
 name: whatdid
-description: Explain "what did the AI just change?" in plain words for people who can't read code. Reads the git changes and says what was done, what's risky, how to check it worked, and how to undo it, and can play an animated replay of the agent's actions in the browser. Use when the user asks "what did you change", "what do these changes mean", "is it safe to accept this", "explain this diff", or seems unable to read a code change.
+description: Explain "what did the AI just change?" in plain words for people who can't read code. Reads the git changes and says what was done, what's risky, how to check it worked, and how to undo it, and can play an animated replay of the agent's actions in the browser. Use when the user asks "what did you change", "what do these changes mean", "is it safe to accept / commit / push this", "explain this diff", "summarize the changes", or "review what the agent did"; when the user says they don't read code or seems unable to follow a diff; or before a non-technical user approves changes that touch secrets, .gitignore, dependencies, databases, deploy files or deletions.
 argument-hint: "[brief|full] [no-replay] [last commit | <file>] · setup · set <setting> <value> · settings"
 allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git show:*), Bash(git log:*), Bash(git rev-parse:*), Bash(git ls-files:*), Read, Grep, Glob, Edit(.whatdid/**)
 ---

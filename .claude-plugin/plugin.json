@@ -1,10 +1,10 @@
 {
   "name": "whatdid",
-  "version": "2.2.0",
-  "description": "Explains what the AI just changed in plain words for people who can't read code: what was done, what's risky, how to check it, how to undo it. Plays the changes back as a little builder robot working on a house.",
+  "version": "2.2.1",
+  "description": "Know what the AI changed before you click Accept. Explains an agent's code changes in plain words for people who don't read code: what changed, what is risky (fixed-rule scan for secrets, deletions, deploy, database and dependency changes), how to check it and how to undo it, with an animated replay.",
   "author": { "name": "TonyIsFool" },
   "homepage": "https://github.com/TonyIsFool/whatdid",
   "repository": "https://github.com/TonyIsFool/whatdid",
   "license": "PolyForm-Strict-1.0.0",
-  "keywords": ["explain", "diff", "beginners", "non-programmers", "changes", "review"]
+  "keywords": ["explain", "diff", "code-review", "change-summary", "risk", "secrets", "undo", "git", "beginners", "non-programmers", "no-code", "vibe-coding", "safety", "replay"]
 }

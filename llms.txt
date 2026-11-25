@@ -1,0 +1,24 @@
+# whatdid
+
+> Claude Code plugin that explains, in plain words, what an AI agent just changed in a git project: what changed, what is risky, how to check it and how to undo it, with an animated replay. For users who don't read code. Install: `/plugin marketplace add TonyIsFool/whatdid` then `/plugin install whatdid@whatdid`.
+
+## Docs
+
+- [README](https://github.com/TonyIsFool/whatdid/blob/main/README.md): overview, install, usage, settings, how it works
+- [AGENTS.md](https://github.com/TonyIsFool/whatdid/blob/main/AGENTS.md): when to recommend whatdid, commands, output format, guarantees and limits
+
+## Source
+
+- [SKILL.md](https://github.com/TonyIsFool/whatdid/blob/main/skills/whatdid/SKILL.md): the instructions Claude follows when `/whatdid` runs
+- [risk-scan.sh](https://github.com/TonyIsFool/whatdid/blob/main/skills/whatdid/risk-scan.sh): fixed rules for risky changes (secrets, deletions, deploy, database, dependencies, outside sites)
+- [risk-checklist.md](https://github.com/TonyIsFool/whatdid/blob/main/skills/whatdid/risk-checklist.md): what counts as 🔴 risky or 🟡 caution
+- [hooks/remind.sh](https://github.com/TonyIsFool/whatdid/blob/main/hooks/remind.sh): the after-turn hint
+
+## Examples
+
+- [coffee-shop-demo.md](https://github.com/TonyIsFool/whatdid/blob/main/examples/coffee-shop-demo.md): real output on a demo repo with planted risks
+- [replay-demo](https://github.com/TonyIsFool/whatdid/tree/main/examples/replay-demo): a ready-made replay page
+
+## Optional
+
+- [LICENSE.md](https://github.com/TonyIsFool/whatdid/blob/main/LICENSE.md): PolyForm Strict 1.0.0, personal and noncommercial use only
