@@ -2,6 +2,10 @@
 
 All notable changes to the public releases of whatdid.
 
+## 2.4.2 (2026-11-26)
+
+**Docs only. No change to what the plugin does.** New animated replay at the top of the README, share image and screenshot, recorded from 2.4.
+
 ## 2.4.1 (2026-11-26)
 
 **Push guard, real-order replay, undo one file.** (2.4.0 was never published on its own; 2.4.1 is 2.4.0 plus fixes, tests and docs.)
